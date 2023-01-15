@@ -5,6 +5,11 @@ from rclpy.clock import Clock
 from rclpy.duration import Duration
 from rclpy.time import Time
 
+NetDict = {
+    DiagnosticStatus.OK: 'OK',
+    DiagnosticStatus.WARN: 'High Network Usage',
+    DiagnosticStatus.ERROR: 'Network Down',
+}
 MemDict = {
     DiagnosticStatus.OK: 'OK',
     DiagnosticStatus.WARN: 'Low Memory',

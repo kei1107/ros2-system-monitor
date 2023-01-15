@@ -177,9 +177,7 @@ class MemMonitor(Node):
             self._last_usage_time = self.get_clock().now()
             self._usage_stat.level = diag_level
             self._usage_stat.values = diag_vals
-
             self._usage_stat.message = usage_msg
-
             if rclpy.ok():
                 self._usage_timer = threading.Timer(5.0, self.check_usage)
                 self._usage_timer.start()
