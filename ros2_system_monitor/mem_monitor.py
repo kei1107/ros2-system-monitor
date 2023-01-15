@@ -47,13 +47,19 @@ import traceback
 from threading import Timer
 from time import sleep
 
-import rospy
-from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
+import diagnostic_updater
+import rclpy
+from diagnostic_msgs.msg import DiagnosticStatus, KeyValue
+from info_dists import StatDict
+from rclpy.clock import Clock
+from rclpy.duration import Duration
+from rclpy.node import Node
+from rclpy.time import Time
 
 mem_level_warn = 0.95
 mem_level_error = 0.99
 
-stat_dict = {0: 'OK', 1: 'Warning', 2: 'Error'}
+StatDict = {0: 'OK', 1: 'Warning', 2: 'Error'}
 
 
 def update_status_stale(stat, last_update_time):
@@ -204,7 +210,7 @@ class MemMonitor():
         if diag_msgs and diag_level > 0:
             usage_msg = ', '.join(set(diag_msgs))
         else:
-            usage_msg = stat_dict[diag_level]
+            usage_msg = StatDict[diag_level]
 
         # Update status
         with self._mutex:
