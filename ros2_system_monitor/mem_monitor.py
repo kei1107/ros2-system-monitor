@@ -50,42 +50,15 @@ from time import sleep
 import diagnostic_updater
 import rclpy
 from diagnostic_msgs.msg import DiagnosticStatus, KeyValue
-from info_dists import StatDict
 from rclpy.clock import Clock
 from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.time import Time
+from utilities import StatDict, update_status_stale
 
 mem_level_warn = 0.95
 mem_level_error = 0.99
 
-StatDict = {0: 'OK', 1: 'Warning', 2: 'Error'}
-
-
-def update_status_stale(stat, last_update_time):
-    time_since_update = rospy.get_time() - last_update_time
-
-    stale_status = 'OK'
-    if time_since_update > 20 and time_since_update <= 35:
-        stale_status = 'Lagging'
-        if stat.level == DiagnosticStatus.OK:
-            stat.message = stale_status
-        elif stat.message.find(stale_status) < 0:
-            stat.message = ', '.join([stat.message, stale_status])
-        stat.level = max(stat.level, DiagnosticStatus.WARN)
-    if time_since_update > 35:
-        stale_status = 'Stale'
-        if stat.level == DiagnosticStatus.OK:
-            stat.message = stale_status
-        elif stat.message.find(stale_status) < 0:
-            stat.message = ', '.join([stat.message, stale_status])
-        stat.level = max(stat.level, DiagnosticStatus.ERROR)
-
-    stat.values.pop(0)
-    stat.values.pop(0)
-    stat.values.insert(0, KeyValue(key='Update Status', value=stale_status))
-    stat.values.insert(1, KeyValue(key='Time Since Update',
-                       value=str(time_since_update)))
 
 
 class MemMonitor():
@@ -93,7 +66,6 @@ class MemMonitor():
         self._diag_pub = rospy.Publisher(
             '/diagnostics', DiagnosticArray, queue_size=100)
 
-        self._mutex = threading.Lock()
 
         self._mem_level_warn = rospy.get_param(
             '~mem_level_warn', mem_level_warn)

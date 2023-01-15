@@ -46,9 +46,8 @@ import rclpy
 from diagnostic_msgs.msg import DiagnosticStatus, KeyValue
 from rclpy.node import Node
 from rclpy.time import Time
-
-from .utilities import (MpstatLoadDict, StatDict, UptimeLoadDict,
-                        update_status_stale)
+from utilities import (MpstatLoadDict, StatDict, UptimeLoadDict,
+                       update_status_stale)
 
 
 class CPUMonitor(Node):
@@ -108,9 +107,19 @@ class CPUMonitor(Node):
         self._has_warned_mpstat = False
         self._has_error_core_count = False
 
-        # Start checking everything (5hz)
-        self._temps_timer = self.create_timer(0.2, self.check_temps)
-        self._usage_timer = self.create_timer(0.2, self.check_usage)
+        # Start checking everything
+        self._temps_timer = None
+        self._usage_timer = None
+        self.check_temps()
+        self.check_usage()
+
+    def cancel_timers(self):
+        """Must have the lock to cancel everrything."""
+        if self._temps_timer:
+            self._temps_timer.cancel()
+
+        if self._usage_timer:
+            self._usage_timer.cancel()
 
     def check_core_temps(self, sys_temp_strings):
         """Check CPU core temps.
@@ -382,6 +391,11 @@ class CPUMonitor(Node):
             return []
 
     def check_temps(self):
+        if not rclpy.ok():
+            with self._mutex:
+                self.cancel_timers()
+            return
+
         diag_vals = [KeyValue(key='Update Status', value='OK'),
                      KeyValue(key='Time Since Last Update', value=str(Time(seconds=0.0)))]
         diag_msgs: list[str] = []
@@ -400,12 +414,24 @@ class CPUMonitor(Node):
         else:
             message = StatDict[diag_level]
 
-        self._last_temp_time = self.get_clock().now()
-        self._temp_stat.level = diag_level
-        self._temp_stat.message = message
-        self._temp_stat.values = diag_vals
+        # update status
+        with self._mutex:
+            self._last_temp_time = self.get_clock().now()
+            self._temp_stat.level = diag_level
+            self._temp_stat.message = message
+            self._temp_stat.values = diag_vals
+            if rclpy.ok():
+                self._temps_timer = threading.Timer(5.0, self.check_temps)
+                self._temps_timer.start()
+            else:
+                self.cancel_timers()
 
     def check_usage(self):
+        if not rclpy.ok():
+            with self._mutex:
+                self.cancel_timers()
+            return
+
         diag_vals = [KeyValue(key='Update Status', value='OK'),
                      KeyValue(key='Time Since Last Update', value=str(0))]
         diag_msgs: list[str] = []
@@ -436,29 +462,38 @@ class CPUMonitor(Node):
         else:
             usage_msg = StatDict[diag_level]
 
-        self._last_usage_time = self.get_clock().now()
-        self._usage_stat.level = diag_level
-        self._usage_stat.values = diag_vals
-        self._usage_stat.message = usage_msg
+        # update status
+        with self._mutex:
+            self._last_usage_time = self.get_clock().now()
+            self._usage_stat.level = diag_level
+            self._usage_stat.values = diag_vals
+            self._usage_stat.message = usage_msg
+            if rclpy.ok():
+                self._usage_timer = threading.Timer(5.0, self.check_usage)
+                self._usage_timer.start()
+            else:
+                self.cancel_timers()
 
     def update_temp_status(self, stat: diagnostic_updater.DiagnosticStatusWrapper):
-        update_status_stale(stat=self._temp_stat,
-                            clock=self.get_clock(),
-                            last_update_time=self._last_temp_time)
-        stat.summary(self._temp_stat.level, self._temp_stat.message)
-        value: KeyValue
-        for value in self._temp_stat.values:
-            stat.add(value.key, value.value)
+        with self._mutex:
+            update_status_stale(stat=self._temp_stat,
+                                clock=self.get_clock(),
+                                last_update_time=self._last_temp_time)
+            stat.summary(self._temp_stat.level, self._temp_stat.message)
+            value: KeyValue
+            for value in self._temp_stat.values:
+                stat.add(value.key, value.value)
         return stat
 
     def update_usage_status(self, stat: diagnostic_updater.DiagnosticStatusWrapper):
-        update_status_stale(stat=self._usage_stat,
-                            clock=self.get_clock(),
-                            last_update_time=self._last_usage_time)
-        stat.summary(self._usage_stat.level, self._usage_stat.message)
-        value: KeyValue
-        for value in self._usage_stat.values:
-            stat.add(value.key, value.value)
+        with self._mutex:
+            update_status_stale(stat=self._usage_stat,
+                                clock=self.get_clock(),
+                                last_update_time=self._last_usage_time)
+            stat.summary(self._usage_stat.level, self._usage_stat.message)
+            value: KeyValue
+            for value in self._usage_stat.values:
+                stat.add(value.key, value.value)
         return stat
 
 
@@ -486,3 +521,6 @@ if __name__ == '__main__':
     except Exception:
         from rclpy.logging import get_logger
         get_logger("cpu_monitor_node").error(traceback.format_exc())
+
+    cpu_node.cancel_timers()
+    sys.exit(0)
