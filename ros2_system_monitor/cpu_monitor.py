@@ -75,9 +75,6 @@ class CPUMonitor(Node):
         # Get temp_input files
         self._temp_vals = self.get_core_temp_names()
 
-        # set diag_hostname
-        self.diag_hostname = diag_hostname
-
         # updater
         self.updater = diagnostic_updater.Updater(self)
         self.updater.setHardwareID(hostname)
@@ -101,7 +98,6 @@ class CPUMonitor(Node):
 
         self._last_temp_time = Time(seconds=0.0)
         self._last_usage_time = Time(seconds=0.0)
-        self._last_publish_time = Time(seconds=0.0)
 
         self._usage_old = 0.0
         self._has_warned_mpstat = False
@@ -114,7 +110,7 @@ class CPUMonitor(Node):
         self.check_usage()
 
     def cancel_timers(self):
-        """Must have the lock to cancel everrything."""
+        """Must have the lock to cancel everything."""
         if self._temps_timer:
             self._temps_timer.cancel()
 
@@ -433,7 +429,7 @@ class CPUMonitor(Node):
             return
 
         diag_vals = [KeyValue(key='Update Status', value='OK'),
-                     KeyValue(key='Time Since Last Update', value=str(0))]
+                     KeyValue(key='Time Since Last Update', value=str(Time(seconds=0.0)))]
         diag_msgs: list[str] = []
         diag_level = DiagnosticStatus.OK
 

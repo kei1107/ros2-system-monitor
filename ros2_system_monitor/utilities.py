@@ -5,6 +5,11 @@ from rclpy.clock import Clock
 from rclpy.duration import Duration
 from rclpy.time import Time
 
+MemDict = {
+    DiagnosticStatus.OK: 'OK',
+    DiagnosticStatus.WARN: 'Low Memory',
+    DiagnosticStatus.ERROR: 'Very Low Memory'
+}
 MpstatLoadDict = {
     DiagnosticStatus.OK: 'OK',
     DiagnosticStatus.WARN: 'High Load',

@@ -34,77 +34,65 @@
 # POSSIBILITY OF SUCH DAMAGE.                                                   #
 #################################################################################
 
-from __future__ import with_statement
-
-import os
 import socket
-import string
 import subprocess
 import sys
 import threading
-import time
 import traceback
-from threading import Timer
-from time import sleep
 
 import diagnostic_updater
 import rclpy
 from diagnostic_msgs.msg import DiagnosticStatus, KeyValue
-from rclpy.clock import Clock
-from rclpy.duration import Duration
 from rclpy.node import Node
 from rclpy.time import Time
-from utilities import StatDict, update_status_stale
-
-mem_level_warn = 0.95
-mem_level_error = 0.99
+from utilities import MemDict, StatDict, update_status_stale
 
 
-
-class MemMonitor():
+class MemMonitor(Node):
     def __init__(self, hostname, diag_hostname):
-        self._diag_pub = rospy.Publisher(
-            '/diagnostics', DiagnosticArray, queue_size=100)
+        super().__init__("mem_monitor")
+        self._mutex = threading.Lock()
 
+        self._mem_level_warn = self.declare_parameter(
+            "mem_level_warn", 0.95).get_parameter_value().double_value
+        self._mem_level_error = self.declare_parameter(
+            "mem_level_error", 0.99).get_parameter_value().double_value
 
-        self._mem_level_warn = rospy.get_param(
-            '~mem_level_warn', mem_level_warn)
-        self._mem_level_error = rospy.get_param(
-            '~mem_level_error', mem_level_error)
+        # updater
+        self.updater = diagnostic_updater.Updater(self)
+        self.updater.setHardwareID(hostname)
 
-        self._usage_timer = None
-
+        # Memory Stat
         self._usage_stat = DiagnosticStatus()
-        self._usage_stat.name = 'Memory Usage (%s)' % diag_hostname
-        self._usage_stat.level = 1
-        self._usage_stat.hardware_id = hostname
+        self._usage_stat.level = DiagnosticStatus.WARN
         self._usage_stat.message = 'No Data'
         self._usage_stat.values = [KeyValue(key='Update Status', value='No Data'),
                                    KeyValue(key='Time Since Last Update', value='N/A')]
+        self.updater.add(
+            f"Memory Usage ({diag_hostname})", self.update_usage_status)
 
-        self._last_usage_time = 0
-        self._last_publish_time = 0
+        self._last_usage_time = Time(seconds=0.0)
 
         # Start checking everything
+        self._usage_timer = None
         self.check_usage()
 
-    ## Must have the lock to cancel everything
     def cancel_timers(self):
+        """Must have the lock to cancel everything."""
         if self._usage_timer:
             self._usage_timer.cancel()
 
     def check_memory(self):
-        values = []
+        values: list[KeyValue] = []
         level = DiagnosticStatus.OK
-        msg = ''
-
-        mem_dict = {0: 'OK', 1: 'Low Memory', 2: 'Very Low Memory'}
+        msg = ""
 
         try:
             p = subprocess.Popen('free -tm',
                                  stdout=subprocess.PIPE,
                                  stderr=subprocess.PIPE, shell=True)
-            stdout, stderr = p.communicate()
+            stdout, _ = p.communicate()
+            stdout = stdout.decode()
             retcode = p.returncode
 
             if retcode != 0:
@@ -135,7 +123,7 @@ class MemMonitor():
             else:
                 level = DiagnosticStatus.ERROR
 
-            values.append(KeyValue(key='Memory Status', value=mem_dict[level]))
+            values.append(KeyValue(key='Memory Status', value=MemDict[level]))
             values.append(KeyValue(key='Total Memory (Physical)',
                           value=total_mem_physical+"M"))
             values.append(KeyValue(key='Used Memory (Physical)',
@@ -152,67 +140,67 @@ class MemMonitor():
             values.append(KeyValue(key='Used Memory', value=used_mem+"M"))
             values.append(KeyValue(key='Free Memory', value=free_mem+"M"))
 
-            msg = mem_dict[level]
-        except Exception, e:
-            rospy.logerr(traceback.format_exc())
+            msg = MemDict[level]
+        except Exception as e:
+            self.get_logger().error(traceback.format_exc())
             msg = 'Memory Usage Check Error'
             values.append(KeyValue(key=msg, value=str(e)))
             level = DiagnosticStatus.ERROR
 
-        return level, mem_dict[level], values
+        return level, MemDict[level], values
 
     def check_usage(self):
-        if rospy.is_shutdown():
+        if not rclpy.ok():
             with self._mutex:
                 self.cancel_timers()
             return
 
-        diag_level = 0
+        diag_level = DiagnosticStatus.OK
         diag_vals = [KeyValue(key='Update Status', value='OK'),
-                     KeyValue(key='Time Since Last Update', value=0)]
-        diag_msgs = []
+                     KeyValue(key='Time Since Last Update', value=str(Time(seconds=0.0)))]
+        diag_msgs: list[str] = []
 
         # Check memory
         mem_level, mem_msg, mem_vals = self.check_memory()
         diag_vals.extend(mem_vals)
-        if mem_level > 0:
+        if mem_level != DiagnosticStatus.OK:
             diag_msgs.append(mem_msg)
         diag_level = max(diag_level, mem_level)
 
-        if diag_msgs and diag_level > 0:
+        if diag_msgs and diag_level != DiagnosticStatus.OK:
             usage_msg = ', '.join(set(diag_msgs))
         else:
             usage_msg = StatDict[diag_level]
 
         # Update status
         with self._mutex:
-            self._last_usage_time = rospy.get_time()
+            self._last_usage_time = self.get_clock().now()
             self._usage_stat.level = diag_level
             self._usage_stat.values = diag_vals
 
             self._usage_stat.message = usage_msg
 
-            if not rospy.is_shutdown():
+            if rclpy.ok():
                 self._usage_timer = threading.Timer(5.0, self.check_usage)
                 self._usage_timer.start()
             else:
                 self.cancel_timers()
 
-    def publish_stats(self):
+    def update_usage_status(self, stat: diagnostic_updater.DiagnosticStatusWrapper):
         with self._mutex:
-            # Update everything with last update times
-            update_status_stale(self._usage_stat, self._last_usage_time)
-
-            msg = DiagnosticArray()
-            msg.header.stamp = rospy.get_rostime()
-            msg.status.append(self._usage_stat)
-
-            if rospy.get_time() - self._last_publish_time > 0.5:
-                self._diag_pub.publish(msg)
-                self._last_publish_time = rospy.get_time()
+            update_status_stale(stat=self._usage_stat,
+                                clock=self.get_clock(),
+                                last_update_time=self._last_usage_time)
+            stat.summary(self._usage_stat.level, self._usage_stat.message)
+            value: KeyValue
+            for value in self._usage_stat.values:
+                stat.add(value.key, value.value)
+        return stat
 
 
 if __name__ == '__main__':
+    rclpy.init(args=sys.argv)
+
     hostname = socket.gethostname()
     hostname = hostname.replace('-', '_')
 
@@ -223,26 +211,17 @@ if __name__ == '__main__':
                       help="Computer name in diagnostics output (ex: 'c1')",
                       metavar="DIAG_HOSTNAME",
                       action="store", default=hostname)
-    options, args = parser.parse_args(rospy.myargv())
+    from rclpy.utilities import remove_ros_args
+    options, args = parser.parse_args(remove_ros_args(sys.argv)[1:])
 
     try:
-        rospy.init_node('mem_monitor_%s' % hostname)
-    except rospy.exceptions.ROSInitException:
-        print >> sys.stderr, 'Memory monitor is unable to initialize node. Master may not be running.'
-        sys.exit(0)
-
-    mem_node = MemMonitor(hostname, options.diag_hostname)
-
-    rate = rospy.Rate(1.0)
-    try:
-        while not rospy.is_shutdown():
-            rate.sleep()
-            mem_node.publish_stats()
+        mem_node = MemMonitor(hostname, options.diag_hostname)
+        rclpy.spin(mem_node)
     except KeyboardInterrupt:
         pass
-    except Exception, e:
-        traceback.print_exc()
-        rospy.logerr(traceback.format_exc())
+    except Exception:
+        from rclpy.logging import get_logger
+        get_logger("mem_monitor_node").error(traceback.format_exc())
 
     mem_node.cancel_timers()
     sys.exit(0)

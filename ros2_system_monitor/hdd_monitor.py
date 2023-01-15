@@ -373,7 +373,7 @@ if __name__ == '__main__':
     try:
         rospy.init_node('hdd_monitor_%s' % hostname)
     except rospy.exceptions.ROSInitException:
-        print 'HDD monitor is unable to initialize node. Master may not be running.'
+        print('HDD monitor is unable to initialize node. Master may not be running.')
         sys.exit(0)
 
     hdd_monitor = hdd_monitor(hostname, options.diag_hostname)
@@ -385,7 +385,7 @@ if __name__ == '__main__':
             hdd_monitor.publish_stats()
     except KeyboardInterrupt:
         pass
-    except Exception, e:
+    except Exception:
         traceback.print_exc()
 
     hdd_monitor.cancel_timers()
