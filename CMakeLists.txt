@@ -19,6 +19,7 @@ install(PROGRAMS
   ${PROJECT_NAME}/cpu_monitor.py
   ${PROJECT_NAME}/mem_monitor.py
   ${PROJECT_NAME}/net_monitor.py
+  ${PROJECT_NAME}/ntp_monitor.py
   DESTINATION lib/${PROJECT_NAME}
 )
 

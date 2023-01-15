@@ -37,50 +37,66 @@
 import re
 import socket
 import sys
-import time
+import threading
+import traceback
 from subprocess import PIPE, Popen
 
-import rospy
-from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
+import diagnostic_updater
+import rclpy
+from diagnostic_msgs.msg import DiagnosticStatus, KeyValue
+from rclpy.node import Node
 
-NAME = 'ntp_monitor'
 
+class NtpMonitor(Node):
+    def __init__(self, hostname, diag_hostname):
+        super().__init__("ntp_monitor")
+        self._mutex = threading.Lock()
 
-def ntp_monitor(offset=500, self_offset=500, diag_hostname=None, error_offset=5000000):
-    pub = rospy.Publisher("/diagnostics", DiagnosticArray, queue_size=100)
-    rospy.init_node(NAME, anonymous=True)
+        self._ntp_hostname = self.declare_parameter(
+            "reference_host", "ntp.ubuntu.com").get_parameter_value().string_value
+        self._offset = self.declare_parameter(
+            "offset_tolerance", 500.0).get_parameter_value().double_value
+        self._error_offset = self.declare_parameter(
+            "error_offset_tolerance", 5000000.0).get_parameter_value().double_value
 
-    hostname = socket.gethostname()
-    if diag_hostname is None:
-        diag_hostname = hostname
+        # updater
+        self.updater = diagnostic_updater.Updater(self)
+        self.updater.setHardwareID(hostname)
 
-    ntp_hostname = rospy.get_param('~reference_host', 'ntp.ubuntu.com')
-    offset = rospy.get_param('~offset_tolerance', 500)
-    error_offset = rospy.get_param('~error_offset_tolerance', 5000000)
+        # Memory Stat
+        self._ntp_stat = DiagnosticStatus()
+        self._ntp_stat.level = DiagnosticStatus.OK
+        self._ntp_stat.message = "OK"
+        self._ntp_stat.values: list[KeyValue] = []
+        self.updater.add(
+            f"NTP offset from {diag_hostname} to {self._ntp_hostname}", self.update_ntp_stat)
 
-    stat = DiagnosticStatus()
-    stat.level = 0
-    stat.name = "NTP offset from " + diag_hostname + " to " + ntp_hostname
-    stat.message = "OK"
-    stat.hardware_id = hostname
-    stat.values = []
+        # Start checking everything
+        self._ntp_timer = None
+        self.check_ntp()
 
-#    self_stat = DiagnosticStatus()
-#    self_stat.level = DiagnosticStatus.OK
-#    self_stat.name = "NTP self-offset for "+ diag_hostname
-#    self_stat.message = "OK"
-#    self_stat.hardware_id = hostname
-#    self_stat.values = []
+    def cancel_timers(self):
+        """Must have the lock to cancel everything."""
+        if self._ntp_timer:
+            self._ntp_timer.cancel()
 
-    while not rospy.is_shutdown():
-        for st, host, off in [(stat, ntp_hostname, offset)]:
+    def check_ntp(self):
+        if not rclpy.ok():
+            with self._mutex:
+                self.cancel_timers()
+            return
+
+        st = DiagnosticStatus()
+        for host, off in [(self._ntp_hostname, self._offset)]:
             try:
                 p = Popen(["ntpdate", "-q", host],
                           stdout=PIPE, stdin=PIPE, stderr=PIPE)
                 res = p.wait()
                 (o, e) = p.communicate()
-            except OSError, (errno, msg):
-                if errno == 4:
+                o = o.decode()
+                e = e.decode()
+            except OSError as e:
+                if e.errno == 4:
                     break  # ctrl-c interrupt
                 else:
                     raise
@@ -89,72 +105,73 @@ def ntp_monitor(offset=500, self_offset=500, diag_hostname=None, error_offset=50
                     re.search("offset (.*),", o).group(1))*1000000
                 st.level = DiagnosticStatus.OK
                 st.message = "OK"
-                st.values = [KeyValue("Offset (us)", str(measured_offset)),
-                             KeyValue("Offset tolerance (us)", str(off)),
-                             KeyValue("Offset tolerance (us) for Error", str(error_offset))]
+                st.values = [KeyValue(key="Offset (us)", value=str(measured_offset)),
+                             KeyValue(key="Offset tolerance (us)",
+                                      value=str(off)),
+                             KeyValue(key="Offset tolerance (us) for Error",
+                                      value=str(self._error_offset))]
 
                 if (abs(measured_offset) > off):
                     st.level = DiagnosticStatus.WARN
                     st.message = "NTP Offset Too High"
-                if (abs(measured_offset) > error_offset):
+                if (abs(measured_offset) > self._error_offset):
                     st.level = DiagnosticStatus.ERROR
                     st.message = "NTP Offset Too High"
 
             else:
                 st.level = DiagnosticStatus.ERROR
-                st.message = "Error Running ntpdate. Returned %d" % res
-                st.values = [KeyValue("Offset (us)", "N/A"),
-                             KeyValue("Offset tolerance (us)", str(off)),
-                             KeyValue("Offset tolerance (us) for Error",
-                                      str(error_offset)),
-                             KeyValue("Output", o),
-                             KeyValue("Errors", e)]
+                st.message = f"Error Running ntpdate. Returned {res}"
+                st.values = [KeyValue(key="Offset (us)", value="N/A"),
+                             KeyValue(key="Offset tolerance (us)",
+                                      value=str(off)),
+                             KeyValue(key="Offset tolerance (us) for Error",
+                                      value=str(self._error_offset)),
+                             KeyValue(key="Output", value=o),
+                             KeyValue(key="Errors", value=e)]
 
-        msg = DiagnosticArray()
-        msg.header.stamp = rospy.get_rostime()
-        msg.status = [stat]
-        pub.publish(msg)
-        time.sleep(1)
+        # Update status
+        with self._mutex:
+            self._ntp_stat.level = st.level
+            self._ntp_stat.values = st.values
+            self._ntp_stat.message = st.message
+            if rclpy.ok():
+                self._ntp_timer = threading.Timer(1.0, self.check_ntp)
+                self._ntp_timer.start()
+            else:
+                self.cancel_timers()
+
+    def update_ntp_stat(self, stat: diagnostic_updater.DiagnosticStatusWrapper):
+        with self._mutex:
+            stat.summary(self._ntp_stat.level, self._ntp_stat.message)
+            value: KeyValue
+            for value in self._ntp_stat.values:
+                stat.add(value.key, value.value)
+        return stat
 
 
-def ntp_monitor_main(argv=sys.argv):
+if __name__ == '__main__':
+    rclpy.init(args=sys.argv)
+
+    hostname = socket.gethostname()
+    hostname = hostname.replace('-', '_')
+
     import optparse
     parser = optparse.OptionParser(usage="usage: ntp_monitor ntp-hostname []")
-    parser.add_option("--offset-tolerance", dest="offset_tol",
-                      action="store", default=500,
-                      help="Offset from NTP host", metavar="OFFSET-TOL")
-    parser.add_option("--error-offset-tolerance", dest="error_offset_tol",
-                      action="store", default=5000000,
-                      help="Offset from NTP host. Above this is error", metavar="OFFSET-TOL")
-    parser.add_option("--self_offset-tolerance", dest="self_offset_tol",
-                      action="store", default=500,
-                      help="Offset from self", metavar="SELF_OFFSET-TOL")
     parser.add_option("--diag-hostname", dest="diag_hostname",
                       help="Computer name in diagnostics output (ex: 'c1')",
                       metavar="DIAG_HOSTNAME",
-                      action="store", default=None)
-    options, args = parser.parse_args(rospy.myargv())
-
-#    if (len(args) != 2):
-#        parser.error("Invalid arguments. Must have HOSTNAME [args]. %s" % args)
+                      action="store", default=hostname)
+    from rclpy.utilities import remove_ros_args
+    options, args = parser.parse_args(remove_ros_args(sys.argv)[1:])
 
     try:
-        offset = int(options.offset_tol)
-        self_offset = int(options.self_offset_tol)
-        error_offset = int(options.error_offset_tol)
-    except:
-        parser.error("Offsets must be numbers")
-
-    ntp_monitor(offset, self_offset, options.diag_hostname, error_offset)
-
-
-if __name__ == "__main__":
-    try:
-        ntp_monitor_main(rospy.myargv())
+        ntp_node = NtpMonitor(hostname, options.diag_hostname)
+        rclpy.spin(ntp_node)
     except KeyboardInterrupt:
         pass
-    except SystemExit:
-        pass
-    except:
-        import traceback
-        traceback.print_exc()
+    except Exception:
+        from rclpy.logging import get_logger
+        get_logger("ntp_monitor_node").error(traceback.format_exc())
+
+    ntp_node.cancel_timers()
+    sys.exit(0)

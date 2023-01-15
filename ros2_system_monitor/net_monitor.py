@@ -50,7 +50,7 @@ from utilities import NetDict, StatDict, update_status_stale
 
 
 def get_sys_net_stat(iface, sys):
-    cmd = 'cat /sys/class/net/%s/statistics/%s' % (iface, sys)
+    cmd = f"cat /sys/class/net/{iface}/statistics/{sys}"
     p = subprocess.Popen(cmd,
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE, shell=True)
@@ -59,7 +59,7 @@ def get_sys_net_stat(iface, sys):
 
 
 def get_sys_net(iface, sys):
-    cmd = 'cat /sys/class/net/%s/%s' % (iface, sys)
+    cmd = f"cat /sys/class/net/{iface}/{sys}"
     p = subprocess.Popen(cmd,
                          stdout=subprocess.PIPE,
                          stderr=subprocess.PIPE, shell=True)
@@ -242,7 +242,7 @@ if __name__ == '__main__':
         pass
     except Exception:
         from rclpy.logging import get_logger
-        get_logger("mem_monitor_node").error(traceback.format_exc())
+        get_logger("net_monitor_node").error(traceback.format_exc())
 
     net_node.cancel_timers()
     sys.exit(0)
