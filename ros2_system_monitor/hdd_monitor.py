@@ -1,56 +1,52 @@
-#!/usr/bin/env python
-############################################################################
-#    Copyright (C) 2009, Willow Garage, Inc.                               #
-#    Copyright (C) 2013 by Ralf Kaestner                                   #
-#    ralf.kaestner@gmail.com                                               #
-#    Copyright (C) 2013 by Jerome Maye                                     #
-#    jerome.maye@mavt.ethz.ch                                              #
-#                                                                          #
-#    All rights reserved.                                                  #
-#                                                                          #
-#    Redistribution and use in source and binary forms, with or without    #
-#    modification, are permitted provided that the following conditions    #
-#    are met:                                                              #
-#                                                                          #
-#    1. Redistributions of source code must retain the above copyright     #
-#       notice, this list of conditions and the following disclaimer.      #
-#                                                                          #
-#    2. Redistributions in binary form must reproduce the above copyright  #
-#       notice, this list of conditions and the following disclaimer in    #
-#       the documentation and/or other materials provided with the         #
-#       distribution.                                                      #
-#                                                                          #
-#    3. The name of the copyright holders may be used to endorse or        #
-#       promote products derived from this software without specific       #
-#       prior written permission.                                          #
-#                                                                          #
-#    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS   #
-#    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT     #
-#    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS     #
-#    FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE        #
-#    COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,  #
-#    INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,  #
-#    BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;      #
-#    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER      #
-#    CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT    #
-#    LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN     #
-#    ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE       #
-#    POSSIBILITY OF SUCH DAMAGE.                                           #
-############################################################################
+#!/usr/bin/env python3
+
+#################################################################################
+# Copyright (C) 2009, Willow Garage, Inc.                                       #
+# Copyright (C) 2013 by Ralf Kaestner                                           #
+# Copyright (C) 2013 by Jerome Maye                                             #
+#                                                                               #
+# All rights reserved.                                                          #
+#                                                                               #
+# Redistribution and use in source and binary forms, with or without            #
+# modification, are permitted provided that the following conditions are met:   #
+#                                                                               #
+#    * Redistributions of source code must retain the above copyright           #
+#      notice, this list of conditions and the following disclaimer.            #
+#                                                                               #
+#    * Redistributions in binary form must reproduce the above copyright        #
+#      notice, this list of conditions and the following disclaimer in the      #
+#      documentation and/or other materials provided with the distribution.     #
+#                                                                               #
+#    * Neither the name of the copyright holder nor the names of its            #
+#      contributors may be used to endorse or promote products derived from     #
+#      this software without specific prior written permission.                 #
+#                                                                               #
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"   #
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE     #
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE    #
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE     #
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR           #
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF          #
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS      #
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN       #
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)       #
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE    #
+# POSSIBILITY OF SUCH DAMAGE.                                                   #
+#################################################################################
 
 from __future__ import with_statement
 
-import rospy
-
-import traceback
-import threading
-from threading import Timer
-import sys, os, time
-from time import sleep
-import subprocess
-
+import os
 import socket
+import subprocess
+import sys
+import threading
+import time
+import traceback
+from threading import Timer
+from time import sleep
 
+import rospy
 from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 
 hdd_level_warn = 0.95
@@ -58,15 +54,18 @@ hdd_level_error = 0.99
 hdd_temp_warn = 55.0
 hdd_temp_error = 70.0
 
-stat_dict = { 0: 'OK', 1: 'Warning', 2: 'Error' }
-temp_dict = { 0: 'OK', 1: 'Hot', 2: 'Critical Hot' }
-usage_dict = { 0: 'OK', 1: 'Low Disk Space', 2: 'Very Low Disk Space' }
+stat_dict = {0: 'OK', 1: 'Warning', 2: 'Error'}
+temp_dict = {0: 'OK', 1: 'Hot', 2: 'Critical Hot'}
+usage_dict = {0: 'OK', 1: 'Low Disk Space', 2: 'Very Low Disk Space'}
 
-REMOVABLE = ['/dev/sg1', '/dev/sdb'] # Store removable drives so we can ignore if removed
+# Store removable drives so we can ignore if removed
+REMOVABLE = ['/dev/sg1', '/dev/sdb']
 
 # TODO: convert hddtemp to `smartctl` or `sensors`
 ## Connects to hddtemp daemon to get temp, HDD make.
-def get_hddtemp_data(hostname = 'localhost', port = 7634):
+
+
+def get_hddtemp_data(hostname='localhost', port=7634):
     try:
         hdd_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         hdd_sock.connect((hostname, port))
@@ -106,7 +105,8 @@ def get_hddtemp_data(hostname = 'localhost', port = 7634):
         return True, drives, makes, temps
     except:
         rospy.loginfo(traceback.format_exc())
-        return False, [ 'Exception' ], [ traceback.format_exc() ], [ 0 ]
+        return False, ['Exception'], [traceback.format_exc()], [0]
+
 
 def update_status_stale(stat, last_update_time):
     time_since_update = rospy.get_time() - last_update_time
@@ -129,8 +129,10 @@ def update_status_stale(stat, last_update_time):
 
     stat.values.pop(0)
     stat.values.pop(0)
-    stat.values.insert(0, KeyValue(key = 'Update Status', value = stale_status))
-    stat.values.insert(1, KeyValue(key = 'Time Since Update', value = str(time_since_update)))
+    stat.values.insert(0, KeyValue(key='Update Status', value=stale_status))
+    stat.values.insert(1, KeyValue(key='Time Since Update',
+                       value=str(time_since_update)))
+
 
 class hdd_monitor():
     def __init__(self, hostname, diag_hostname):
@@ -139,12 +141,16 @@ class hdd_monitor():
         self._hostname = hostname
         self._no_temp = rospy.get_param('~no_hdd_temp', False)
         self._no_temp_warn = rospy.get_param('~no_hdd_temp_warn', False)
-        self._hdd_level_warn = rospy.get_param('~hdd_level_warn', hdd_level_warn)
-        self._hdd_level_error = rospy.get_param('~hdd_level_error', hdd_level_error)
+        self._hdd_level_warn = rospy.get_param(
+            '~hdd_level_warn', hdd_level_warn)
+        self._hdd_level_error = rospy.get_param(
+            '~hdd_level_error', hdd_level_error)
         self._hdd_temp_warn = rospy.get_param('~hdd_temp_warn', hdd_temp_warn)
-        self._hdd_temp_error = rospy.get_param('~hdd_temp_error', hdd_temp_error)
+        self._hdd_temp_error = rospy.get_param(
+            '~hdd_temp_error', hdd_temp_error)
 
-        self._diag_pub = rospy.Publisher('/diagnostics', DiagnosticArray, queue_size = 100)
+        self._diag_pub = rospy.Publisher(
+            '/diagnostics', DiagnosticArray, queue_size=100)
 
         self._last_publish_time = 0
 
@@ -156,8 +162,8 @@ class hdd_monitor():
           self._temp_stat.level = DiagnosticStatus.ERROR
           self._temp_stat.hardware_id = hostname
           self._temp_stat.message = 'No Data'
-          self._temp_stat.values = [ KeyValue(key = 'Update Status', value = 'No Data'),
-                                    KeyValue(key = 'Time Since Last Update', value = 'N/A') ]
+          self._temp_stat.values = [KeyValue(key='Update Status', value='No Data'),
+                                    KeyValue(key='Time Since Last Update', value='N/A')]
           self.check_temps()
 
         self._last_usage_time = 0
@@ -166,8 +172,8 @@ class hdd_monitor():
         self._usage_stat.level = DiagnosticStatus.ERROR
         self._usage_stat.hardware_id = hostname
         self._usage_stat.name = 'HDD Usage (%s)' % diag_hostname
-        self._usage_stat.values = [ KeyValue(key = 'Update Status', value = 'No Data' ),
-                                    KeyValue(key = 'Time Since Last Update', value = 'N/A') ]
+        self._usage_stat.values = [KeyValue(key='Update Status', value='No Data'),
+                                   KeyValue(key='Time Since Last Update', value='N/A')]
         self.check_disk_usage()
 
     ## Must have the lock to cancel everything
@@ -186,8 +192,8 @@ class hdd_monitor():
                 self.cancel_timers()
             return
 
-        diag_strs = [ KeyValue(key = 'Update Status', value = 'OK' ) ,
-                      KeyValue(key = 'Time Since Last Update', value = '0' ) ]
+        diag_strs = [KeyValue(key='Update Status', value='OK'),
+                     KeyValue(key='Time Since Last Update', value='0')]
         diag_level = DiagnosticStatus.OK
         diag_message = 'OK'
 
@@ -211,10 +217,14 @@ class hdd_monitor():
 
             diag_level = max(diag_level, temp_level)
 
-            diag_strs.append(KeyValue(key = 'Disk %d Temperature Status' % index, value = temp_dict[temp_level]))
-            diag_strs.append(KeyValue(key = 'Disk %d Mount Pt.' % index, value = drives[index]))
-            diag_strs.append(KeyValue(key = 'Disk %d Device ID' % index, value = makes[index]))
-            diag_strs.append(KeyValue(key = 'Disk %d Temperature' % index, value = str(temp)+"DegC"))
+            diag_strs.append(KeyValue(key='Disk %d Temperature Status' %
+                             index, value=temp_dict[temp_level]))
+            diag_strs.append(KeyValue(key='Disk %d Mount Pt.' %
+                             index, value=drives[index]))
+            diag_strs.append(KeyValue(key='Disk %d Device ID' %
+                             index, value=makes[index]))
+            diag_strs.append(KeyValue(key='Disk %d Temperature' %
+                             index, value=str(temp)+"DegC"))
 
         if not temp_ok:
             diag_level = DiagnosticStatus.ERROR
@@ -244,18 +254,20 @@ class hdd_monitor():
                 self.cancel_timers()
             return
 
-        diag_vals = [ KeyValue(key = 'Update Status', value = 'OK' ),
-                      KeyValue(key = 'Time Since Last Update', value = '0' ) ]
+        diag_vals = [KeyValue(key='Update Status', value='OK'),
+                     KeyValue(key='Time Since Last Update', value='0')]
         diag_level = DiagnosticStatus.OK
         diag_message = 'OK'
 
         try:
-            p = subprocess.Popen(["df", "-Pht", "ext4"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            p = subprocess.Popen(["df", "-Pht", "ext4"],
+                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             stdout, stderr = p.communicate()
             retcode = p.returncode
 
             if (retcode == 0 or retcode == 1):
-                diag_vals.append(KeyValue(key = 'Disk Space Reading', value = 'OK'))
+                diag_vals.append(
+                    KeyValue(key='Disk Space Reading', value='OK'))
                 rows = stdout.split('\n')
                 del rows[0]
                 row_count = 0
@@ -282,32 +294,34 @@ class hdd_monitor():
                         level = DiagnosticStatus.ERROR
 
                     diag_vals.append(KeyValue(
-                            key = 'Disk %d Name' % row_count, value = name))
+                        key='Disk %d Name' % row_count, value=name))
                     diag_vals.append(KeyValue(
-                            key = 'Disk %d Size' % row_count, value = size))
+                        key='Disk %d Size' % row_count, value=size))
                     diag_vals.append(KeyValue(
-                            key = 'Disk %d Available' % row_count, value = g_available))
+                        key='Disk %d Available' % row_count, value=g_available))
                     diag_vals.append(KeyValue(
-                            key = 'Disk %d Use' % row_count, value = g_use))
+                        key='Disk %d Use' % row_count, value=g_use))
                     diag_vals.append(KeyValue(
-                            key = 'Disk %d Status' % row_count, value = stat_dict[level]))
+                        key='Disk %d Status' % row_count, value=stat_dict[level]))
                     diag_vals.append(KeyValue(
-                            key = 'Disk %d Mount Point' % row_count, value = mount_pt))
+                        key='Disk %d Mount Point' % row_count, value=mount_pt))
 
                     diag_level = max(diag_level, level)
                     diag_message = usage_dict[diag_level]
 
             else:
-                diag_vals.append(KeyValue(key = 'Disk Space Reading', value = 'Failed'))
+                diag_vals.append(
+                    KeyValue(key='Disk Space Reading', value='Failed'))
                 diag_level = DiagnosticStatus.ERROR
                 diag_message = stat_dict[diag_level]
-
 
         except:
             rospy.logerr(traceback.format_exc())
 
-            diag_vals.append(KeyValue(key = 'Disk Space Reading', value = 'Exception'))
-            diag_vals.append(KeyValue(key = 'Disk Space Ex', value = traceback.format_exc()))
+            diag_vals.append(
+                KeyValue(key='Disk Space Reading', value='Exception'))
+            diag_vals.append(KeyValue(key='Disk Space Ex',
+                             value=traceback.format_exc()))
 
             diag_level = DiagnosticStatus.ERROR
             diag_message = stat_dict[diag_level]
@@ -324,7 +338,6 @@ class hdd_monitor():
                 self._usage_timer.start()
             else:
                 self.cancel_timers()
-
 
     def publish_stats(self):
         with self._mutex:
@@ -343,20 +356,18 @@ class hdd_monitor():
                 self._last_publish_time = rospy.get_time()
 
 
-
-
 ##\todo Need to check HDD input/output too using iostat
-
 if __name__ == '__main__':
     hostname = socket.gethostname()
     hostname = hostname.replace('-', '_')
 
     import optparse
-    parser = optparse.OptionParser(usage="usage: hdd_monitor.py [--diag-hostname=cX]")
+    parser = optparse.OptionParser(
+        usage="usage: hdd_monitor.py [--diag-hostname=cX]")
     parser.add_option("--diag-hostname", dest="diag_hostname",
                       help="Computer name in diagnostics output (ex: 'c1')",
                       metavar="DIAG_HOSTNAME",
-                      action="store", default = hostname)
+                      action="store", default=hostname)
     options, args = parser.parse_args(rospy.myargv())
 
     try:

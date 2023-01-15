@@ -1,56 +1,53 @@
-#!/usr/bin/env python
-############################################################################
-#    Copyright (C) 2009, Willow Garage, Inc.                               #
-#    Copyright (C) 2013 by Jerome Maye                                     #
-#    jerome.maye@mavt.ethz.ch                                              #
-#                                                                          #
-#    All rights reserved.                                                  #
-#                                                                          #
-#    Redistribution and use in source and binary forms, with or without    #
-#    modification, are permitted provided that the following conditions    #
-#    are met:                                                              #
-#                                                                          #
-#    1. Redistributions of source code must retain the above copyright     #
-#       notice, this list of conditions and the following disclaimer.      #
-#                                                                          #
-#    2. Redistributions in binary form must reproduce the above copyright  #
-#       notice, this list of conditions and the following disclaimer in    #
-#       the documentation and/or other materials provided with the         #
-#       distribution.                                                      #
-#                                                                          #
-#    3. The name of the copyright holders may be used to endorse or        #
-#       promote products derived from this software without specific       #
-#       prior written permission.                                          #
-#                                                                          #
-#    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS   #
-#    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT     #
-#    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS     #
-#    FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE        #
-#    COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,  #
-#    INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,  #
-#    BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;      #
-#    LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER      #
-#    CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT    #
-#    LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN     #
-#    ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE       #
-#    POSSIBILITY OF SUCH DAMAGE.                                           #
-############################################################################
+#!/usr/bin/env python3
 
-from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
-
-import sys
-import rospy
-import socket
-from subprocess import Popen, PIPE
-
-import time
+#################################################################################
+# Copyright (C) 2009, Willow Garage, Inc.                                       #
+# Copyright (C) 2013 by Ralf Kaestner                                           #
+# Copyright (C) 2013 by Jerome Maye                                             #
+#                                                                               #
+# All rights reserved.                                                          #
+#                                                                               #
+# Redistribution and use in source and binary forms, with or without            #
+# modification, are permitted provided that the following conditions are met:   #
+#                                                                               #
+#    * Redistributions of source code must retain the above copyright           #
+#      notice, this list of conditions and the following disclaimer.            #
+#                                                                               #
+#    * Redistributions in binary form must reproduce the above copyright        #
+#      notice, this list of conditions and the following disclaimer in the      #
+#      documentation and/or other materials provided with the distribution.     #
+#                                                                               #
+#    * Neither the name of the copyright holder nor the names of its            #
+#      contributors may be used to endorse or promote products derived from     #
+#      this software without specific prior written permission.                 #
+#                                                                               #
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"   #
+# AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE     #
+# IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE    #
+# ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE     #
+# LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR           #
+# CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF          #
+# SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS      #
+# INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN       #
+# CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)       #
+# ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE    #
+# POSSIBILITY OF SUCH DAMAGE.                                                   #
+#################################################################################
 
 import re
+import socket
+import sys
+import time
+from subprocess import PIPE, Popen
+
+import rospy
+from diagnostic_msgs.msg import DiagnosticArray, DiagnosticStatus, KeyValue
 
 NAME = 'ntp_monitor'
 
-def ntp_monitor(offset=500, self_offset=500, diag_hostname = None, error_offset = 5000000):
-    pub = rospy.Publisher("/diagnostics", DiagnosticArray, queue_size = 100)
+
+def ntp_monitor(offset=500, self_offset=500, diag_hostname=None, error_offset=5000000):
+    pub = rospy.Publisher("/diagnostics", DiagnosticArray, queue_size=100)
     rospy.init_node(NAME, anonymous=True)
 
     hostname = socket.gethostname()
@@ -63,7 +60,7 @@ def ntp_monitor(offset=500, self_offset=500, diag_hostname = None, error_offset 
 
     stat = DiagnosticStatus()
     stat.level = 0
-    stat.name = "NTP offset from "+ diag_hostname + " to " + ntp_hostname
+    stat.name = "NTP offset from " + diag_hostname + " to " + ntp_hostname
     stat.message = "OK"
     stat.hardware_id = hostname
     stat.values = []
@@ -76,23 +73,25 @@ def ntp_monitor(offset=500, self_offset=500, diag_hostname = None, error_offset 
 #    self_stat.values = []
 
     while not rospy.is_shutdown():
-        for st,host,off in [(stat,ntp_hostname,offset)]:
+        for st, host, off in [(stat, ntp_hostname, offset)]:
             try:
-                p = Popen(["ntpdate", "-q", host], stdout=PIPE, stdin=PIPE, stderr=PIPE)
+                p = Popen(["ntpdate", "-q", host],
+                          stdout=PIPE, stdin=PIPE, stderr=PIPE)
                 res = p.wait()
-                (o,e) = p.communicate()
+                (o, e) = p.communicate()
             except OSError, (errno, msg):
                 if errno == 4:
-                    break #ctrl-c interrupt
+                    break  # ctrl-c interrupt
                 else:
                     raise
             if (res == 0):
-                measured_offset = float(re.search("offset (.*),", o).group(1))*1000000
+                measured_offset = float(
+                    re.search("offset (.*),", o).group(1))*1000000
                 st.level = DiagnosticStatus.OK
                 st.message = "OK"
-                st.values = [ KeyValue("Offset (us)", str(measured_offset)),
-                              KeyValue("Offset tolerance (us)", str(off)),
-                              KeyValue("Offset tolerance (us) for Error", str(error_offset)) ]
+                st.values = [KeyValue("Offset (us)", str(measured_offset)),
+                             KeyValue("Offset tolerance (us)", str(off)),
+                             KeyValue("Offset tolerance (us) for Error", str(error_offset))]
 
                 if (abs(measured_offset) > off):
                     st.level = DiagnosticStatus.WARN
@@ -104,18 +103,19 @@ def ntp_monitor(offset=500, self_offset=500, diag_hostname = None, error_offset 
             else:
                 st.level = DiagnosticStatus.ERROR
                 st.message = "Error Running ntpdate. Returned %d" % res
-                st.values = [ KeyValue("Offset (us)", "N/A"),
-                              KeyValue("Offset tolerance (us)", str(off)),
-                              KeyValue("Offset tolerance (us) for Error", str(error_offset)),
-                              KeyValue("Output", o),
-                              KeyValue("Errors", e) ]
-
+                st.values = [KeyValue("Offset (us)", "N/A"),
+                             KeyValue("Offset tolerance (us)", str(off)),
+                             KeyValue("Offset tolerance (us) for Error",
+                                      str(error_offset)),
+                             KeyValue("Output", o),
+                             KeyValue("Errors", e)]
 
         msg = DiagnosticArray()
         msg.header.stamp = rospy.get_rostime()
         msg.status = [stat]
         pub.publish(msg)
         time.sleep(1)
+
 
 def ntp_monitor_main(argv=sys.argv):
     import optparse
@@ -126,7 +126,7 @@ def ntp_monitor_main(argv=sys.argv):
     parser.add_option("--error-offset-tolerance", dest="error_offset_tol",
                       action="store", default=5000000,
                       help="Offset from NTP host. Above this is error", metavar="OFFSET-TOL")
-    parser.add_option("--self_offset-tolerance", dest="self_offset_tol", 
+    parser.add_option("--self_offset-tolerance", dest="self_offset_tol",
                       action="store", default=500,
                       help="Offset from self", metavar="SELF_OFFSET-TOL")
     parser.add_option("--diag-hostname", dest="diag_hostname",
@@ -138,13 +138,12 @@ def ntp_monitor_main(argv=sys.argv):
 #    if (len(args) != 2):
 #        parser.error("Invalid arguments. Must have HOSTNAME [args]. %s" % args)
 
-
     try:
         offset = int(options.offset_tol)
         self_offset = int(options.self_offset_tol)
         error_offset = int(options.error_offset_tol)
     except:
-        parser.error("Offsets must be numbers")        
+        parser.error("Offsets must be numbers")
 
     ntp_monitor(offset, self_offset, options.diag_hostname, error_offset)
 
@@ -152,8 +151,10 @@ def ntp_monitor_main(argv=sys.argv):
 if __name__ == "__main__":
     try:
         ntp_monitor_main(rospy.myargv())
-    except KeyboardInterrupt: pass
-    except SystemExit: pass
+    except KeyboardInterrupt:
+        pass
+    except SystemExit:
+        pass
     except:
         import traceback
         traceback.print_exc()
