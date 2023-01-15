@@ -11,15 +11,14 @@ ament_auto_find_build_dependencies()
 
 ament_python_install_package(${PROJECT_NAME})
 
-install(
-  DIRECTORY config
+install(DIRECTORY config scripts launch
   DESTINATION share/${PROJECT_NAME})
 
 install(PROGRAMS
-  ${PROJECT_NAME}/cpu_monitor.py
-  ${PROJECT_NAME}/mem_monitor.py
-  ${PROJECT_NAME}/net_monitor.py
-  ${PROJECT_NAME}/ntp_monitor.py
+  scripts/cpu_monitor_node.py
+  scripts/mem_monitor_node.py
+  scripts/net_monitor_node.py
+  scripts/ntp_monitor_node.py
   DESTINATION lib/${PROJECT_NAME}
 )
 
