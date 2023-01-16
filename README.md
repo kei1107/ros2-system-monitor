@@ -13,14 +13,12 @@ System monitoring tools for ROS2.
 This project provides system monitoring tools for ROS2 in the form of the following ROS2 nodes:
 
 * CPU monitor
+* HDD monitor
 * Memory monitor
 * Network monitor
 * NTP monitor
 
 Each node publishes ROS diagnostics which can conveniently be visualized in the runtime monitor.
-
-**NOTE** (About HDD monitor)  
-`hddtemp` is no longer avaiable on ubuntu 22.04. Instead, `smartctl` or `lm-sensors` must be used. Will be supported in the future.
 
 ## Installation
 

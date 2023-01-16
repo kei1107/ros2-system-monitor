@@ -1,3 +1,17 @@
+ros-system-monitor (0.2-1)
+
+  * ROS2 support of HDD monitor
+
+-- kei1107 <clavis1107@gmail.com>
+
+ros-system-monitor (0.2-0)
+
+  * ROS2 support of CPU monitor, Memory monitor, Network monitor and NTP monitor
+
+-- kei1107 <clavis1107@gmail.com>
+
+---
+
 ros-system-monitor (0.1-22) unstable; urgency=low
 
   * Updated changelog
