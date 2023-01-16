@@ -25,9 +25,7 @@
   <exec_depend>rclpy</exec_depend>
   <exec_depend>std_msgs</exec_depend>
   <exec_depend>sysstat</exec_depend>
-  <!-- <exec_depend>hddtemp</exec_depend> -->
-  <!-- <exec_depend>smartmontools</exec_depend> -->
-  <!-- <exec_depend>lm-sensors</exec_depend> -->
+  <exec_depend>lm-sensors</exec_depend>
 
   <test_depend>ament_lint_auto</test_depend>
   <!-- <test_depend>ament_cmake_copyright</test_depend> -->

@@ -51,6 +51,8 @@ def generate_launch_description():
         description="system monitor config file path")
     declare_enable_cpu_monitor = DeclareLaunchArgument(
         name="enable_cpu_monitor", default_value="true", description="enable cpu_monitor if true")
+    declare_enable_hdd_monitor = DeclareLaunchArgument(
+        name="enable_hdd_monitor", default_value="true", description="enable hdd_monitor if true")
     declare_enable_mem_monitor = DeclareLaunchArgument(
         name="enable_mem_monitor", default_value="true", description="enable mem_monitor if true")
     declare_enable_net_monitor = DeclareLaunchArgument(
@@ -65,6 +67,14 @@ def generate_launch_description():
         respawn=True,
         emulate_tty=True,
         condition=IfCondition(LaunchConfiguration("enable_cpu_monitor"))
+    )
+    hdd_monitor = Node(
+        package="ros2_system_monitor",
+        executable="hdd_monitor_node.py",
+        parameters=[LaunchConfiguration("system_monitor_config_file")],
+        respawn=True,
+        emulate_tty=True,
+        condition=IfCondition(LaunchConfiguration("enable_hdd_monitor"))
     )
     mem_monitor = Node(
         package="ros2_system_monitor",
@@ -97,12 +107,14 @@ def generate_launch_description():
     # declare the launch options
     ld.add_action(declare_config_file)
     ld.add_action(declare_enable_cpu_monitor)
+    ld.add_action(declare_enable_hdd_monitor)
     ld.add_action(declare_enable_mem_monitor)
     ld.add_action(declare_enable_net_monitor)
     ld.add_action(declare_enable_ntp_monitor)
 
     # add the actions
     ld.add_action(cpu_monitor)
+    ld.add_action(hdd_monitor)
     ld.add_action(mem_monitor)
     ld.add_action(net_monitor)
     ld.add_action(ntp_monitor)

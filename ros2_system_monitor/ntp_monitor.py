@@ -34,10 +34,7 @@
 #################################################################################
 
 import re
-import socket
-import sys
 import threading
-import traceback
 from subprocess import PIPE, Popen
 
 import diagnostic_updater
@@ -146,31 +143,3 @@ class NtpMonitor(Node):
             for value in self._ntp_stat.values:
                 stat.add(value.key, value.value)
         return stat
-
-
-if __name__ == '__main__':
-    rclpy.init(args=sys.argv)
-
-    hostname = socket.gethostname()
-    hostname = hostname.replace('-', '_')
-
-    import optparse
-    parser = optparse.OptionParser(usage="usage: ntp_monitor ntp-hostname []")
-    parser.add_option("--diag-hostname", dest="diag_hostname",
-                      help="Computer name in diagnostics output (ex: 'c1')",
-                      metavar="DIAG_HOSTNAME",
-                      action="store", default=hostname)
-    from rclpy.utilities import remove_ros_args
-    options, args = parser.parse_args(remove_ros_args(sys.argv)[1:])
-
-    try:
-        ntp_node = NtpMonitor(hostname, options.diag_hostname)
-        rclpy.spin(ntp_node)
-    except KeyboardInterrupt:
-        pass
-    except Exception:
-        from rclpy.logging import get_logger
-        get_logger("ntp_monitor_node").error(traceback.format_exc())
-
-    ntp_node.cancel_timers()
-    sys.exit(0)

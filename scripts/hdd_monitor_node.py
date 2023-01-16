@@ -33,11 +33,37 @@
 # POSSIBILITY OF SUCH DAMAGE.
 #################################################################################
 
-from .cpu_monitor import CPUMonitor
-from .hdd_monitor import HDDMonitor
-from .mem_monitor import MemMonitor
-from .net_monitor import NetMonitor
-from .ntp_monitor import NtpMonitor
+import socket
+import sys
+import traceback
 
-__all__ = ['CPUMonitor', 'HDDMonitor',
-           'MemMonitor', 'NetMonitor', 'NtpMonitor']
+import rclpy
+from ros2_system_monitor import HDDMonitor
+
+if __name__ == '__main__':
+    rclpy.init(args=sys.argv)
+
+    hostname = socket.gethostname()
+    hostname = hostname.replace('-', '_')
+
+    import optparse
+    parser = optparse.OptionParser(
+        usage="usage: hdd_monitor.py [--diag-hostname=cX]")
+    parser.add_option("--diag-hostname", dest="diag_hostname",
+                      help="Computer name in diagnostics output (ex: 'c1')",
+                      metavar="DIAG_HOSTNAME",
+                      action="store", default=hostname)
+    from rclpy.utilities import remove_ros_args
+    options, args = parser.parse_args(remove_ros_args(sys.argv)[1:])
+
+    try:
+        hdd_node = HDDMonitor(hostname, options.diag_hostname)
+        rclpy.spin(hdd_node)
+    except KeyboardInterrupt:
+        pass
+    except Exception:
+        from rclpy.logging import get_logger
+        get_logger("hdd_monitor_node").error(traceback.format_exc())
+
+    hdd_node.cancel_timers()
+    sys.exit(0)

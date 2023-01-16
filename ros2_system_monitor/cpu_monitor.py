@@ -34,6 +34,7 @@
 #################################################################################
 
 import multiprocessing
+import re
 import subprocess
 import threading
 import traceback
@@ -68,9 +69,6 @@ class CPUMonitor(Node):
             "cpu_temp_error", 90.0).get_parameter_value().double_value
 
         self._num_cores = multiprocessing.cpu_count()
-
-        # Get temp_input files
-        self._temp_vals = self.get_core_temp_names()
 
         # updater
         self.updater = diagnostic_updater.Updater(self)
@@ -114,39 +112,39 @@ class CPUMonitor(Node):
         if self._usage_timer:
             self._usage_timer.cancel()
 
-    def check_core_temps(self, sys_temp_strings):
+    def check_core_temps(self):
         """
         Check CPU core temps.
 
-        Use 'find /sys -name temp1_input' to find cores
-        Read from every core, divide by 1000
+        Use 'sensors' to find cores
+        Read from every core
         """
         diag_vals: list[KeyValue] = []
         diag_msgs: list[str] = []
         diag_level = DiagnosticStatus.OK
 
-        for index, temp_str in enumerate(sys_temp_strings):
-            if len(temp_str) < 5:
-                continue
+        p = subprocess.Popen("sensors", stdout=subprocess.PIPE,
+                             stderr=subprocess.PIPE, shell=True)
+        stdout, stderr = p.communicate()
+        stdout = stdout.decode()
+        stderr = stderr.decode()
+        retcode = p.returncode
 
-            cmd = f"cat {temp_str}"
-            p = subprocess.Popen(cmd, stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE, shell=True)
-            stdout, stderr = p.communicate()
-            stdout = stdout.decode()
-            stderr = stderr.decode()
-            retcode = p.returncode
+        if retcode != 0:
+            diag_level = DiagnosticStatus.ERROR
+            diag_msgs = ['Core Temperature Error']
+            diag_vals = [KeyValue(key='Core Temperature Error', value=stderr),
+                         KeyValue(key='Output', value=stdout)]
+            return diag_vals, diag_msgs, diag_level
 
-            if retcode != 0:
-                diag_level = DiagnosticStatus.ERROR
-                diag_msgs = ['Core Temperature Error']
-                diag_vals = [KeyValue(key='Core Temperature Error', value=stderr),
-                             KeyValue(key='Output', value=stdout)]
-                return diag_vals, diag_msgs, diag_level
-
-            tmp = stdout.strip()
-            if tmp.isnumeric():
-                temp = float(tmp) / 1000
+        rows = stdout.split('\n')
+        r = re.compile("Core [0-9]{1,}:.*")
+        cores_info = list(filter(r.match, rows))
+        for index, core_info in enumerate(cores_info):
+            data = core_info.split()
+            tmp = data[2][:-2]
+            try:
+                temp = float(tmp)
                 diag_vals.append(
                     KeyValue(key=f"Core {index} Temperature", value=str(temp)+"DegC"))
 
@@ -156,7 +154,7 @@ class CPUMonitor(Node):
                 elif temp >= self._cpu_temp_error:
                     diag_level = max(diag_level, DiagnosticStatus.ERROR)
                     diag_msgs.append('Hot')
-            else:
+            except ValueError:
                 # Error if not numeric value
                 diag_level = max(diag_level, DiagnosticStatus.ERROR)
                 diag_vals.append(
@@ -349,42 +347,11 @@ class CPUMonitor(Node):
                     self._has_error_core_count = True
                 return DiagnosticStatus.ERROR, 'Incorrect number of CPU cores', vals
         except Exception as e:
-            print(traceback.print_exc())
+            self.get_logger().error(traceback.print_exc())
             mp_level = DiagnosticStatus.ERROR
             vals.append(KeyValue(key='mpstat Exception', value=str(e)))
 
         return mp_level, MpstatLoadDict[mp_level], vals
-
-    def get_core_temp_names(self):
-        """
-        Get core temp names.
-
-        Returns names for core temperature files
-        Returns list of names as each name can be read like file
-        """
-        temp_vals: list[str] = []
-        try:
-            p = subprocess.Popen('find /sys/devices -name temp1_input',
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE, shell=True)
-            stdout, stderr = p.communicate()
-            stdout = stdout.decode()
-            stderr = stderr.decode()
-            retcode = p.returncode
-
-            if retcode != 0:
-                self.get_logger().error(
-                    f"Error find core temp locations: {stderr}")
-                return []
-
-            for ln in stdout.split('\n'):
-                temp_vals.append(ln.strip())
-
-            return temp_vals
-        except Exception:
-            self.get_logger().error(
-                f"Exception finding temp vals: {traceback.format_exc()}")
-            return []
 
     def check_temps(self):
         if not rclpy.ok():
@@ -398,8 +365,7 @@ class CPUMonitor(Node):
         diag_level = DiagnosticStatus.OK
 
         if self._check_core_temps:
-            core_vals, core_msgs, core_level = self.check_core_temps(
-                self._temp_vals)
+            core_vals, core_msgs, core_level = self.check_core_temps()
             diag_vals.extend(core_vals)
             diag_msgs.extend(core_msgs)
             diag_level = max(diag_level, core_level)

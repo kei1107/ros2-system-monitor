@@ -34,9 +34,7 @@
 #################################################################################
 
 import re
-import socket
 import subprocess
-import sys
 import threading
 import traceback
 
@@ -217,32 +215,3 @@ class NetMonitor(Node):
             for value in self._usage_stat.values:
                 stat.add(value.key, value.value)
         return stat
-
-
-if __name__ == '__main__':
-    rclpy.init(args=sys.argv)
-
-    hostname = socket.gethostname()
-    hostname = hostname.replace('-', '_')
-
-    import optparse
-    parser = optparse.OptionParser(
-        usage="usage: net_monitor.py [--diag-hostname=cX]")
-    parser.add_option("--diag-hostname", dest="diag_hostname",
-                      help="Computer name in diagnostics output (ex: 'c1')",
-                      metavar="DIAG_HOSTNAME",
-                      action="store", default=hostname)
-    from rclpy.utilities import remove_ros_args
-    options, args = parser.parse_args(remove_ros_args(sys.argv)[1:])
-
-    try:
-        net_node = NetMonitor(hostname, options.diag_hostname)
-        rclpy.spin(net_node)
-    except KeyboardInterrupt:
-        pass
-    except Exception:
-        from rclpy.logging import get_logger
-        get_logger("net_monitor_node").error(traceback.format_exc())
-
-    net_node.cancel_timers()
-    sys.exit(0)

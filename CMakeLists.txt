@@ -16,6 +16,7 @@ install(DIRECTORY config scripts launch
 
 install(PROGRAMS
   scripts/cpu_monitor_node.py
+  scripts/hdd_monitor_node.py
   scripts/mem_monitor_node.py
   scripts/net_monitor_node.py
   scripts/ntp_monitor_node.py
