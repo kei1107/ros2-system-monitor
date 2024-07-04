@@ -97,8 +97,15 @@ class NtpMonitor(Node):
                 else:
                     raise
             if (res == 0):
-                measured_offset = float(
-                    re.search("offset (.*),", o).group(1))*1000000
+                if "offset" in o:
+                    measured_offset = float(
+                        re.search("offset (.*),", o).group(1))*1000000
+                else:
+                    # Newer ntpdate versions output the following
+                    #   YYYY-MM-DD HH:MM:SS.SSSSSS (UTC Offset) OFFSET +/ DELAY HOST IP STRATUM LEAP
+                    # Instead of using regex to get the offset, we can
+                    # split on spaces and use the fourth value.
+                    measured_offset = float(o.split()[3])*1000000
                 st.level = DiagnosticStatus.OK
                 st.message = "OK"
                 st.values = [KeyValue(key="Offset (us)", value=str(measured_offset)),
