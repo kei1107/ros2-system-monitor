@@ -72,7 +72,8 @@ class NtpMonitor(Node):
         self._ntp_stat = DiagnosticStatus()
         self._ntp_stat.level = DiagnosticStatus.OK
         self._ntp_stat.message = "OK"
-        self._ntp_stat.values: list[KeyValue] = []
+        # list[KeyValue]
+        self._ntp_stat.values = []
         self.updater.add(
             f"NTP offset from {diag_hostname} to {self._ntp_hostname}",
             self.update_ntp_stat,

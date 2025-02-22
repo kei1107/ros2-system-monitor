@@ -146,8 +146,10 @@ class CPUMonitor(Node):
         Use 'sensors' to find cores
         Read from every core
         """
-        diag_vals: list[KeyValue] = []
-        diag_msgs: list[str] = []
+        # list[KeyValue]
+        diag_vals = []
+        # list[str]
+        diag_msgs = []
         diag_level = DiagnosticStatus.OK
 
         p = subprocess.Popen(
@@ -194,8 +196,9 @@ class CPUMonitor(Node):
 
     def check_clock_speed(self):
         """Check clock speed from reading from CPU info."""
-        vals: list[KeyValue] = []
-        msgs: list[str] = []
+        # list[KeyValue]
+        vals = []
+        msgs = []
         lvl = DiagnosticStatus.OK
 
         try:
@@ -242,7 +245,8 @@ class CPUMonitor(Node):
     def check_uptime(self):
         """Use 'uptime' to see load average."""
         level = DiagnosticStatus.OK
-        vals: list[KeyValue] = []
+        # list[KeyValue]
+        vals = []
 
         try:
             p = subprocess.Popen(
@@ -290,7 +294,8 @@ class CPUMonitor(Node):
 
     def check_mpstat(self):
         """Use mpstat to find CPU usage."""
-        vals: list[KeyValue] = []
+        # list[KeyValue]
+        vals = []
         mp_level = DiagnosticStatus.OK
 
         try:
@@ -407,7 +412,8 @@ class CPUMonitor(Node):
             KeyValue(key="Update Status", value="OK"),
             KeyValue(key="Time Since Last Update", value=str(Time(seconds=0.0))),
         ]
-        diag_msgs: list[str] = []
+        # list[str]
+        diag_msgs = []
         diag_level = DiagnosticStatus.OK
 
         if self._check_core_temps:
@@ -444,7 +450,8 @@ class CPUMonitor(Node):
             KeyValue(key="Update Status", value="OK"),
             KeyValue(key="Time Since Last Update", value=str(Time(seconds=0.0))),
         ]
-        diag_msgs: list[str] = []
+        # list[str]
+        diag_msgs = []
         diag_level = DiagnosticStatus.OK
 
         # Check clock speed

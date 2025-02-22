@@ -106,7 +106,8 @@ class NetMonitor(Node):
             self._usage_timer.cancel()
 
     def check_network(self):
-        values: list[KeyValue] = []
+        # list[KeyValue]
+        values = []
 
         try:
             p = subprocess.Popen(
@@ -209,7 +210,8 @@ class NetMonitor(Node):
             KeyValue(key="Update Status", value="OK"),
             KeyValue(key="Time Since Last Update", value=str(Time(seconds=0.0))),
         ]
-        diag_msgs: list[str] = []
+        # list[str]
+        diag_msgs = []
 
         # Check network
         net_level, net_msg, net_vals = self.check_network()

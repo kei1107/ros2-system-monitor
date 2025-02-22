@@ -87,7 +87,8 @@ class MemMonitor(Node):
             self._usage_timer.cancel()
 
     def check_memory(self):
-        values: list[KeyValue] = []
+        # list[KeyValue]
+        values = []
         level = DiagnosticStatus.OK
         msg = ""
 
@@ -165,7 +166,8 @@ class MemMonitor(Node):
             KeyValue(key="Update Status", value="OK"),
             KeyValue(key="Time Since Last Update", value=str(Time(seconds=0.0))),
         ]
-        diag_msgs: list[str] = []
+        # list[str]
+        diag_msgs = []
 
         # Check memory
         mem_level, mem_msg, mem_vals = self.check_memory()

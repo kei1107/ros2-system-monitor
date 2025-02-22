@@ -159,7 +159,8 @@ class HDDMonitor(Node):
             KeyValue(key="Update Status", value="OK"),
             KeyValue(key="Time Since Last Update", value=str(Time(seconds=0.0))),
         ]
-        diag_msgs: list[str] = []
+        # list[str]
+        diag_msgs = []
         diag_level = DiagnosticStatus.OK
 
         sensors_ok = True
@@ -185,7 +186,7 @@ class HDDMonitor(Node):
                 diag_msgs.append("Unable to Check HW Temp")
                 sensors_ok = False
             else:
-                sensors_data: dict = json.loads(stdout)
+                sensors_data = json.loads(stdout)
                 hw_paths, temps = self.get_temp_input(sensors_data)
                 assert len(hw_paths) == len(temps)
                 for index in range(0, len(hw_paths)):
