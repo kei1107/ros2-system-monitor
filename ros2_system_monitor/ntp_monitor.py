@@ -48,12 +48,21 @@ class NtpMonitor(Node):
         super().__init__("ntp_monitor")
         self._mutex = threading.Lock()
 
-        self._ntp_hostname = self.declare_parameter(
-            "reference_host", "ntp.ubuntu.com").get_parameter_value().string_value
-        self._offset = self.declare_parameter(
-            "offset_tolerance", 500.0).get_parameter_value().double_value
-        self._error_offset = self.declare_parameter(
-            "error_offset_tolerance", 5000000.0).get_parameter_value().double_value
+        self._ntp_hostname = (
+            self.declare_parameter("reference_host", "ntp.ubuntu.com")
+            .get_parameter_value()
+            .string_value
+        )
+        self._offset = (
+            self.declare_parameter("offset_tolerance", 500.0)
+            .get_parameter_value()
+            .double_value
+        )
+        self._error_offset = (
+            self.declare_parameter("error_offset_tolerance", 5000000.0)
+            .get_parameter_value()
+            .double_value
+        )
 
         # updater
         self.updater = diagnostic_updater.Updater(self)
@@ -63,9 +72,12 @@ class NtpMonitor(Node):
         self._ntp_stat = DiagnosticStatus()
         self._ntp_stat.level = DiagnosticStatus.OK
         self._ntp_stat.message = "OK"
-        self._ntp_stat.values: list[KeyValue] = []
+        # list[KeyValue]
+        self._ntp_stat.values = []
         self.updater.add(
-            f"NTP offset from {diag_hostname} to {self._ntp_hostname}", self.update_ntp_stat)
+            f"NTP offset from {diag_hostname} to {self._ntp_hostname}",
+            self.update_ntp_stat,
+        )
 
         # Start checking everything
         self._ntp_timer = None
@@ -85,8 +97,7 @@ class NtpMonitor(Node):
         st = DiagnosticStatus()
         for host, off in [(self._ntp_hostname, self._offset)]:
             try:
-                p = Popen(["ntpdate", "-q", host],
-                          stdout=PIPE, stdin=PIPE, stderr=PIPE)
+                p = Popen(["ntpdate", "-q", host], stdout=PIPE, stdin=PIPE, stderr=PIPE)
                 res = p.wait()
                 (o, e) = p.communicate()
                 o = o.decode()
@@ -96,41 +107,48 @@ class NtpMonitor(Node):
                     break  # ctrl-c interrupt
                 else:
                     raise
-            if (res == 0):
+            if res == 0:
                 if "offset" in o:
-                    measured_offset = float(
-                        re.search("offset (.*),", o).group(1))*1000000
+                    measured_offset = (
+                        float(re.search("offset (.*),", o).group(1)) * 1000000
+                    )
                 else:
                     # Newer ntpdate versions output the following
-                    #   YYYY-MM-DD HH:MM:SS.SSSSSS (UTC Offset) OFFSET +/ DELAY HOST IP STRATUM LEAP
+                    #  YYYY-MM-DD HH:MM:SS.SSSSSS (UTC Offset) OFFSET + DELAY HOST IP STRATUM LEAP
                     # Instead of using regex to get the offset, we can
                     # split on spaces and use the fourth value.
-                    measured_offset = float(o.split()[3])*1000000
+                    measured_offset = float(o.split()[3]) * 1000000
                 st.level = DiagnosticStatus.OK
                 st.message = "OK"
-                st.values = [KeyValue(key="Offset (us)", value=str(measured_offset)),
-                             KeyValue(key="Offset tolerance (us)",
-                                      value=str(off)),
-                             KeyValue(key="Offset tolerance (us) for Error",
-                                      value=str(self._error_offset))]
+                st.values = [
+                    KeyValue(key="Offset (us)", value=str(measured_offset)),
+                    KeyValue(key="Offset tolerance (us)", value=str(off)),
+                    KeyValue(
+                        key="Offset tolerance (us) for Error",
+                        value=str(self._error_offset),
+                    ),
+                ]
 
-                if (abs(measured_offset) > off):
+                if abs(measured_offset) > off:
                     st.level = DiagnosticStatus.WARN
                     st.message = "NTP Offset Too High"
-                if (abs(measured_offset) > self._error_offset):
+                if abs(measured_offset) > self._error_offset:
                     st.level = DiagnosticStatus.ERROR
                     st.message = "NTP Offset Too High"
 
             else:
                 st.level = DiagnosticStatus.ERROR
                 st.message = f"Error Running ntpdate. Returned {res}"
-                st.values = [KeyValue(key="Offset (us)", value="N/A"),
-                             KeyValue(key="Offset tolerance (us)",
-                                      value=str(off)),
-                             KeyValue(key="Offset tolerance (us) for Error",
-                                      value=str(self._error_offset)),
-                             KeyValue(key="Output", value=o),
-                             KeyValue(key="Errors", value=e)]
+                st.values = [
+                    KeyValue(key="Offset (us)", value="N/A"),
+                    KeyValue(key="Offset tolerance (us)", value=str(off)),
+                    KeyValue(
+                        key="Offset tolerance (us) for Error",
+                        value=str(self._error_offset),
+                    ),
+                    KeyValue(key="Output", value=o),
+                    KeyValue(key="Errors", value=e),
+                ]
 
         # Update status
         with self._mutex:

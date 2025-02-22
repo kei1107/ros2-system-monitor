@@ -44,8 +44,12 @@ import rclpy
 from diagnostic_msgs.msg import DiagnosticStatus, KeyValue
 from rclpy.node import Node
 from rclpy.time import Time
-from ros2_system_monitor.utilities import (MpstatLoadDict, StatDict,
-                                           UptimeLoadDict, update_status_stale)
+from ros2_system_monitor.utilities import (
+    MpstatLoadDict,
+    StatDict,
+    UptimeLoadDict,
+    update_status_stale,
+)
 
 
 class CPUMonitor(Node):
@@ -53,20 +57,41 @@ class CPUMonitor(Node):
         super().__init__("cpu_monitor")
         self._mutex = threading.Lock()
 
-        self._check_core_temps = self.declare_parameter(
-            "check_core_temps", True).get_parameter_value().bool_value
-        self._cpu_load_warn = self.declare_parameter(
-            "cpu_load_warn", 0.9).get_parameter_value().double_value
-        self._cpu_load_error = self.declare_parameter(
-            "cpu_load_error", 1.1).get_parameter_value().double_value
-        self._cpu_load1_warn = self.declare_parameter(
-            "cpu_load1_warn", 0.9).get_parameter_value().double_value
-        self._cpu_load5_warn = self.declare_parameter(
-            "cpu_load5_warn", 0.8).get_parameter_value().double_value
-        self._cpu_temp_warn = self.declare_parameter(
-            "cpu_temp_warn", 85.0).get_parameter_value().double_value
-        self._cpu_temp_error = self.declare_parameter(
-            "cpu_temp_error", 90.0).get_parameter_value().double_value
+        self._check_core_temps = (
+            self.declare_parameter("check_core_temps", True)
+            .get_parameter_value()
+            .bool_value
+        )
+        self._cpu_load_warn = (
+            self.declare_parameter("cpu_load_warn", 0.9)
+            .get_parameter_value()
+            .double_value
+        )
+        self._cpu_load_error = (
+            self.declare_parameter("cpu_load_error", 1.1)
+            .get_parameter_value()
+            .double_value
+        )
+        self._cpu_load1_warn = (
+            self.declare_parameter("cpu_load1_warn", 0.9)
+            .get_parameter_value()
+            .double_value
+        )
+        self._cpu_load5_warn = (
+            self.declare_parameter("cpu_load5_warn", 0.8)
+            .get_parameter_value()
+            .double_value
+        )
+        self._cpu_temp_warn = (
+            self.declare_parameter("cpu_temp_warn", 85.0)
+            .get_parameter_value()
+            .double_value
+        )
+        self._cpu_temp_error = (
+            self.declare_parameter("cpu_temp_error", 90.0)
+            .get_parameter_value()
+            .double_value
+        )
 
         self._num_cores = multiprocessing.cpu_count()
 
@@ -78,18 +103,20 @@ class CPUMonitor(Node):
         self._temp_stat = DiagnosticStatus()
         self._temp_stat.level = DiagnosticStatus.WARN
         self._temp_stat.message = "No Data"
-        self._temp_stat.values = [KeyValue(key='Update Status', value='No Data'),
-                                  KeyValue(key='Time Since Last Update', value='N/A')]
-        self.updater.add(
-            f"CPU Temperature ({diag_hostname})", self.update_temp_status)
+        self._temp_stat.values = [
+            KeyValue(key="Update Status", value="No Data"),
+            KeyValue(key="Time Since Last Update", value="N/A"),
+        ]
+        self.updater.add(f"CPU Temperature ({diag_hostname})", self.update_temp_status)
 
         self._usage_stat = DiagnosticStatus()
         self._usage_stat.level = DiagnosticStatus.WARN
-        self._usage_stat.message = 'No Data'
-        self._usage_stat.values = [KeyValue(key='Update Status', value='No Data'),
-                                   KeyValue(key='Time Since Last Update', value='N/A')]
-        self.updater.add(
-            f"CPU Usage ({diag_hostname})", self.update_usage_status)
+        self._usage_stat.message = "No Data"
+        self._usage_stat.values = [
+            KeyValue(key="Update Status", value="No Data"),
+            KeyValue(key="Time Since Last Update", value="N/A"),
+        ]
+        self.updater.add(f"CPU Usage ({diag_hostname})", self.update_usage_status)
 
         self._last_temp_time = Time(seconds=0.0)
         self._last_usage_time = Time(seconds=0.0)
@@ -119,12 +146,15 @@ class CPUMonitor(Node):
         Use 'sensors' to find cores
         Read from every core
         """
-        diag_vals: list[KeyValue] = []
-        diag_msgs: list[str] = []
+        # list[KeyValue]
+        diag_vals = []
+        # list[str]
+        diag_msgs = []
         diag_level = DiagnosticStatus.OK
 
-        p = subprocess.Popen("sensors", stdout=subprocess.PIPE,
-                             stderr=subprocess.PIPE, shell=True)
+        p = subprocess.Popen(
+            "sensors", stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
+        )
         stdout, stderr = p.communicate()
         stdout = stdout.decode()
         stderr = stderr.decode()
@@ -132,12 +162,14 @@ class CPUMonitor(Node):
 
         if retcode != 0:
             diag_level = DiagnosticStatus.ERROR
-            diag_msgs = ['Core Temperature Error']
-            diag_vals = [KeyValue(key='Core Temperature Error', value=stderr),
-                         KeyValue(key='Output', value=stdout)]
+            diag_msgs = ["Core Temperature Error"]
+            diag_vals = [
+                KeyValue(key="Core Temperature Error", value=stderr),
+                KeyValue(key="Output", value=stdout),
+            ]
             return diag_vals, diag_msgs, diag_level
 
-        rows = stdout.split('\n')
+        rows = stdout.split("\n")
         r = re.compile("Core [0-9]{1,}:.*")
         cores_info = list(filter(r.match, rows))
         for index, core_info in enumerate(cores_info):
@@ -146,32 +178,36 @@ class CPUMonitor(Node):
             try:
                 temp = float(tmp)
                 diag_vals.append(
-                    KeyValue(key=f"Core {index} Temperature", value=str(temp)+"DegC"))
+                    KeyValue(key=f"Core {index} Temperature", value=str(temp) + "DegC")
+                )
 
                 if temp >= self._cpu_temp_warn:
                     diag_level = max(diag_level, DiagnosticStatus.WARN)
-                    diag_msgs.append('Warm')
+                    diag_msgs.append("Warm")
                 elif temp >= self._cpu_temp_error:
                     diag_level = max(diag_level, DiagnosticStatus.ERROR)
-                    diag_msgs.append('Hot')
+                    diag_msgs.append("Hot")
             except ValueError:
                 # Error if not numeric value
                 diag_level = max(diag_level, DiagnosticStatus.ERROR)
-                diag_vals.append(
-                    KeyValue(key=f"Core {index} Temperature", value=tmp))
+                diag_vals.append(KeyValue(key=f"Core {index} Temperature", value=tmp))
 
         return diag_vals, diag_msgs, diag_level
 
     def check_clock_speed(self):
         """Check clock speed from reading from CPU info."""
-        vals: list[KeyValue] = []
-        msgs: list[str] = []
+        # list[KeyValue]
+        vals = []
+        msgs = []
         lvl = DiagnosticStatus.OK
 
         try:
-            p = subprocess.Popen('cat /proc/cpuinfo | grep MHz',
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE, shell=True)
+            p = subprocess.Popen(
+                "cat /proc/cpuinfo | grep MHz",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                shell=True,
+            )
             stdout, stderr = p.communicate()
             stdout = stdout.decode()
             stderr = stderr.decode()
@@ -179,83 +215,96 @@ class CPUMonitor(Node):
 
             if retcode != 0:
                 lvl = DiagnosticStatus.ERROR
-                msgs = ['Clock speed error']
-                vals = [KeyValue(key='Clock speed error', value=stderr),
-                        KeyValue(key='Output', value=stdout)]
+                msgs = ["Clock speed error"]
+                vals = [
+                    KeyValue(key="Clock speed error", value=stderr),
+                    KeyValue(key="Output", value=stdout),
+                ]
 
                 return (vals, msgs, lvl)
 
-            for index, ln in enumerate(stdout.split('\n')):
-                words = ln.split(':')
+            for index, ln in enumerate(stdout.split("\n")):
+                words = ln.split(":")
                 if len(words) < 2:
                     continue
 
                 # Conversion to float doesn't work with decimal
-                speed = words[1].strip().split('.')[0]
+                speed = words[1].strip().split(".")[0]
                 vals.append(
-                    KeyValue(key=f"Core {index} Clock Speed", value=speed+"MHz"))
+                    KeyValue(key=f"Core {index} Clock Speed", value=speed + "MHz")
+                )
 
         except Exception:
             self.get_logger().error(traceback.format_exc())
             lvl = DiagnosticStatus.ERROR
-            msgs.append('Exception')
-            vals.append(KeyValue(key='Exception',
-                        value=traceback.format_exc()))
+            msgs.append("Exception")
+            vals.append(KeyValue(key="Exception", value=traceback.format_exc()))
 
         return vals, msgs, lvl
 
     def check_uptime(self):
         """Use 'uptime' to see load average."""
         level = DiagnosticStatus.OK
-        vals: list[KeyValue] = []
+        # list[KeyValue]
+        vals = []
 
         try:
-            p = subprocess.Popen('uptime', stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE, shell=True)
+            p = subprocess.Popen(
+                "uptime", stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
+            )
             stdout, stderr = p.communicate()
             stdout = stdout.decode()
             stderr = stderr.decode()
             retcode = p.returncode
 
             if retcode != 0:
-                vals.append(KeyValue(key='uptime Failed', value=stderr))
+                vals.append(KeyValue(key="uptime Failed", value=stderr))
                 return DiagnosticStatus.ERROR, vals
 
             upvals = stdout.split()
-            load1 = float(upvals[-3].rstrip(','))/self._num_cores
-            load5 = float(upvals[-2].rstrip(','))/self._num_cores
-            load15 = float(upvals[-1])/self._num_cores
+            load1 = float(upvals[-3].rstrip(",")) / self._num_cores
+            load5 = float(upvals[-2].rstrip(",")) / self._num_cores
+            load15 = float(upvals[-1]) / self._num_cores
 
             # Give warning if we go over load limit
             if load1 > self._cpu_load1_warn or load5 > self._cpu_load5_warn:
                 level = DiagnosticStatus.WARN
 
-            vals.append(KeyValue(key='Load Average Status',
-                        value=UptimeLoadDict[level]))
-            vals.append(KeyValue(key='Load Average (1min)',
-                        value=str(load1*1e2)+"%"))
-            vals.append(KeyValue(key='Load Average (5min)',
-                        value=str(load5*1e2)+"%"))
-            vals.append(KeyValue(key='Load Average (15min)',
-                        value=str(load15*1e2)+"%"))
+            vals.append(
+                KeyValue(key="Load Average Status", value=UptimeLoadDict[level])
+            )
+            vals.append(
+                KeyValue(key="Load Average (1min)", value=str(load1 * 1e2) + "%")
+            )
+            vals.append(
+                KeyValue(key="Load Average (5min)", value=str(load5 * 1e2) + "%")
+            )
+            vals.append(
+                KeyValue(key="Load Average (15min)", value=str(load15 * 1e2) + "%")
+            )
 
         except Exception:
             self.get_logger().error(traceback.format_exc())
             level = DiagnosticStatus.ERROR
-            vals.append(KeyValue(key='Load Average Status',
-                        value=traceback.format_exc()))
+            vals.append(
+                KeyValue(key="Load Average Status", value=traceback.format_exc())
+            )
 
         return level, UptimeLoadDict[level], vals
 
     def check_mpstat(self):
         """Use mpstat to find CPU usage."""
-        vals: list[KeyValue] = []
+        # list[KeyValue]
+        vals = []
         mp_level = DiagnosticStatus.OK
 
         try:
-            p = subprocess.Popen('mpstat -P ALL 1 1',
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE, shell=True)
+            p = subprocess.Popen(
+                "mpstat -P ALL 1 1",
+                stdout=subprocess.PIPE,
+                stderr=subprocess.PIPE,
+                shell=True,
+            )
             stdout, _ = p.communicate()
             stdout = stdout.decode()
             retcode = p.returncode
@@ -263,29 +312,28 @@ class CPUMonitor(Node):
             if retcode != 0:
                 if not self._has_warned_mpstat:
                     self.get_logger().error(
-                        f"mpstat failed to run for cpu_monitor. Return code {retcode}.")
+                        f"mpstat failed to run for cpu_monitor. Return code {retcode}."
+                    )
                     self._has_warned_mpstat = True
 
                 mp_level = DiagnosticStatus.ERROR
-                vals.append(
-                    KeyValue(key='\"mpstat\" Call Error', value=str(retcode)))
-                return mp_level, 'Unable to Check CPU Usage', vals
+                vals.append(KeyValue(key='"mpstat" Call Error', value=str(retcode)))
+                return mp_level, "Unable to Check CPU Usage", vals
 
             # Check which column '%idle' is, #4539
             # mpstat output changed between 8.06 and 8.1
-            rows = stdout.split('\n')
+            rows = stdout.split("\n")
             col_names = rows[2].split()
-            idle_col = -1 if (len(col_names) >
-                              2 and col_names[-1] == '%idle') else -2
+            idle_col = -1 if (len(col_names) > 2 and col_names[-1] == "%idle") else -2
 
             num_cores = 0
             cores_loaded = 0
-            for index, row in enumerate(stdout.split('\n')):
+            for index, row in enumerate(stdout.split("\n")):
                 if index < 3:
                     continue
 
                 # Skip row containing 'all' data
-                if row.find('all') > -1:
+                if row.find("all") > -1:
                     continue
 
                 lst = row.split()
@@ -293,7 +341,7 @@ class CPUMonitor(Node):
                     continue
 
                 # Ignore 'Average: ...' data
-                if lst[0].startswith('Average'):
+                if lst[0].startswith("Average"):
                     continue
 
                 cpu_name = str(num_cores)
@@ -303,11 +351,12 @@ class CPUMonitor(Node):
                 system = lst[5]
 
                 core_level = DiagnosticStatus.OK
-                usage = (float(user)+float(nice))*1e-2
+                usage = (float(user) + float(nice)) * 1e-2
                 if usage > 10.0:  # wrong reading, use old reading instead
                     self.get_logger().warning(
                         f"Read CPU usage of {usage} percent. "
-                        f"Reverting to previous reading of {self._usage_old} percent")
+                        f"Reverting to previous reading of {self._usage_old} percent"
+                    )
                     usage = self._usage_old
                 self._usage_old = usage
 
@@ -318,15 +367,14 @@ class CPUMonitor(Node):
                     core_level = DiagnosticStatus.ERROR
 
                 vals.append(
-                    KeyValue(key=f"Core {cpu_name} Status", value=MpstatLoadDict[core_level]))
-                vals.append(
-                    KeyValue(key=f"Core {cpu_name} User", value=user+"%"))
-                vals.append(
-                    KeyValue(key=f"Core {cpu_name} Nice", value=nice+"%"))
-                vals.append(
-                    KeyValue(key=f"Core {cpu_name} System", value=system+"%"))
-                vals.append(
-                    KeyValue(key=f"Core {cpu_name} Idle", value=idle+"%"))
+                    KeyValue(
+                        key=f"Core {cpu_name} Status", value=MpstatLoadDict[core_level]
+                    )
+                )
+                vals.append(KeyValue(key=f"Core {cpu_name} User", value=user + "%"))
+                vals.append(KeyValue(key=f"Core {cpu_name} Nice", value=nice + "%"))
+                vals.append(KeyValue(key=f"Core {cpu_name} System", value=system + "%"))
+                vals.append(KeyValue(key=f"Core {cpu_name} Idle", value=idle + "%"))
 
                 num_cores += 1
 
@@ -343,13 +391,14 @@ class CPUMonitor(Node):
                 if not self._has_error_core_count:
                     self.get_logger().error(
                         f"Error checking number of cores. Expected {self._num_cores}"
-                        f"got {num_cores}. Computer may have not booted properly.")
+                        f"got {num_cores}. Computer may have not booted properly."
+                    )
                     self._has_error_core_count = True
-                return DiagnosticStatus.ERROR, 'Incorrect number of CPU cores', vals
+                return DiagnosticStatus.ERROR, "Incorrect number of CPU cores", vals
         except Exception as e:
             self.get_logger().error(traceback.print_exc())
             mp_level = DiagnosticStatus.ERROR
-            vals.append(KeyValue(key='mpstat Exception', value=str(e)))
+            vals.append(KeyValue(key="mpstat Exception", value=str(e)))
 
         return mp_level, MpstatLoadDict[mp_level], vals
 
@@ -359,9 +408,12 @@ class CPUMonitor(Node):
                 self.cancel_timers()
             return
 
-        diag_vals = [KeyValue(key='Update Status', value='OK'),
-                     KeyValue(key='Time Since Last Update', value=str(Time(seconds=0.0)))]
-        diag_msgs: list[str] = []
+        diag_vals = [
+            KeyValue(key="Update Status", value="OK"),
+            KeyValue(key="Time Since Last Update", value=str(Time(seconds=0.0))),
+        ]
+        # list[str]
+        diag_msgs = []
         diag_level = DiagnosticStatus.OK
 
         if self._check_core_temps:
@@ -372,7 +424,7 @@ class CPUMonitor(Node):
 
         diag_log = set(diag_msgs)
         if len(diag_log) > 0:
-            message = ', '.join(diag_log)
+            message = ", ".join(diag_log)
         else:
             message = StatDict[diag_level]
 
@@ -394,9 +446,12 @@ class CPUMonitor(Node):
                 self.cancel_timers()
             return
 
-        diag_vals = [KeyValue(key='Update Status', value='OK'),
-                     KeyValue(key='Time Since Last Update', value=str(Time(seconds=0.0)))]
-        diag_msgs: list[str] = []
+        diag_vals = [
+            KeyValue(key="Update Status", value="OK"),
+            KeyValue(key="Time Since Last Update", value=str(Time(seconds=0.0))),
+        ]
+        # list[str]
+        diag_msgs = []
         diag_level = DiagnosticStatus.OK
 
         # Check clock speed
@@ -420,7 +475,7 @@ class CPUMonitor(Node):
         diag_level = max(diag_level, uptime_level)
 
         if diag_msgs and diag_level != DiagnosticStatus.OK:
-            usage_msg = ', '.join(set(diag_msgs))
+            usage_msg = ", ".join(set(diag_msgs))
         else:
             usage_msg = StatDict[diag_level]
 
@@ -438,9 +493,11 @@ class CPUMonitor(Node):
 
     def update_temp_status(self, stat: diagnostic_updater.DiagnosticStatusWrapper):
         with self._mutex:
-            update_status_stale(stat=self._temp_stat,
-                                clock=self.get_clock(),
-                                last_update_time=self._last_temp_time)
+            update_status_stale(
+                stat=self._temp_stat,
+                clock=self.get_clock(),
+                last_update_time=self._last_temp_time,
+            )
             stat.summary(self._temp_stat.level, self._temp_stat.message)
             value: KeyValue
             for value in self._temp_stat.values:
@@ -449,9 +506,11 @@ class CPUMonitor(Node):
 
     def update_usage_status(self, stat: diagnostic_updater.DiagnosticStatusWrapper):
         with self._mutex:
-            update_status_stale(stat=self._usage_stat,
-                                clock=self.get_clock(),
-                                last_update_time=self._last_usage_time)
+            update_status_stale(
+                stat=self._usage_stat,
+                clock=self.get_clock(),
+                last_update_time=self._last_usage_time,
+            )
             stat.summary(self._usage_stat.level, self._usage_stat.message)
             value: KeyValue
             for value in self._usage_stat.values:

@@ -36,7 +36,7 @@
 import os
 
 from ament_index_python.packages import get_package_share_directory
-from launch import LaunchDescription
+from launch.launch_description import LaunchDescription
 from launch.actions import DeclareLaunchArgument
 from launch.conditions import IfCondition
 from launch.substitutions import LaunchConfiguration
@@ -44,21 +44,41 @@ from launch_ros.actions import Node
 
 
 def generate_launch_description():
-    config_file_default = os.path.join(get_package_share_directory(
-        "ros2_system_monitor"), "config", "system_monitor.yaml")
+    config_file_default = os.path.join(
+        get_package_share_directory("ros2_system_monitor"),
+        "config",
+        "system_monitor.yaml",
+    )
     declare_config_file = DeclareLaunchArgument(
-        name="system_monitor_config_file", default_value=config_file_default,
-        description="system monitor config file path")
+        name="system_monitor_config_file",
+        default_value=config_file_default,
+        description="system monitor config file path",
+    )
     declare_enable_cpu_monitor = DeclareLaunchArgument(
-        name="enable_cpu_monitor", default_value="true", description="enable cpu_monitor if true")
+        name="enable_cpu_monitor",
+        default_value="true",
+        description="enable cpu_monitor if true",
+    )
     declare_enable_hdd_monitor = DeclareLaunchArgument(
-        name="enable_hdd_monitor", default_value="true", description="enable hdd_monitor if true")
+        name="enable_hdd_monitor",
+        default_value="true",
+        description="enable hdd_monitor if true",
+    )
     declare_enable_mem_monitor = DeclareLaunchArgument(
-        name="enable_mem_monitor", default_value="true", description="enable mem_monitor if true")
+        name="enable_mem_monitor",
+        default_value="true",
+        description="enable mem_monitor if true",
+    )
     declare_enable_net_monitor = DeclareLaunchArgument(
-        name="enable_net_monitor", default_value="true", description="enable net_monitor if true")
+        name="enable_net_monitor",
+        default_value="true",
+        description="enable net_monitor if true",
+    )
     declare_enable_ntp_monitor = DeclareLaunchArgument(
-        name="enable_ntp_monitor", default_value="true", description="enable ntp_monitor if true")
+        name="enable_ntp_monitor",
+        default_value="true",
+        description="enable ntp_monitor if true",
+    )
 
     cpu_monitor = Node(
         package="ros2_system_monitor",
@@ -66,7 +86,7 @@ def generate_launch_description():
         parameters=[LaunchConfiguration("system_monitor_config_file")],
         respawn=True,
         emulate_tty=True,
-        condition=IfCondition(LaunchConfiguration("enable_cpu_monitor"))
+        condition=IfCondition(LaunchConfiguration("enable_cpu_monitor")),
     )
     hdd_monitor = Node(
         package="ros2_system_monitor",
@@ -74,7 +94,7 @@ def generate_launch_description():
         parameters=[LaunchConfiguration("system_monitor_config_file")],
         respawn=True,
         emulate_tty=True,
-        condition=IfCondition(LaunchConfiguration("enable_hdd_monitor"))
+        condition=IfCondition(LaunchConfiguration("enable_hdd_monitor")),
     )
     mem_monitor = Node(
         package="ros2_system_monitor",
@@ -82,7 +102,7 @@ def generate_launch_description():
         parameters=[LaunchConfiguration("system_monitor_config_file")],
         respawn=True,
         emulate_tty=True,
-        condition=IfCondition(LaunchConfiguration("enable_mem_monitor"))
+        condition=IfCondition(LaunchConfiguration("enable_mem_monitor")),
     )
     net_monitor = Node(
         package="ros2_system_monitor",
@@ -90,7 +110,7 @@ def generate_launch_description():
         parameters=[LaunchConfiguration("system_monitor_config_file")],
         respawn=True,
         emulate_tty=True,
-        condition=IfCondition(LaunchConfiguration("enable_net_monitor"))
+        condition=IfCondition(LaunchConfiguration("enable_net_monitor")),
     )
     ntp_monitor = Node(
         package="ros2_system_monitor",
@@ -98,7 +118,7 @@ def generate_launch_description():
         parameters=[LaunchConfiguration("system_monitor_config_file")],
         respawn=True,
         emulate_tty=True,
-        condition=IfCondition(LaunchConfiguration("enable_ntp_monitor"))
+        condition=IfCondition(LaunchConfiguration("enable_ntp_monitor")),
     )
 
     # create the launch description

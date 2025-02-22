@@ -19,6 +19,7 @@
   <buildtool_depend>ament_cmake_auto</buildtool_depend>
   <buildtool_depend>ament_cmake_python</buildtool_depend>
 
+  <exec_depend>diagnostic_updater</exec_depend>
   <exec_depend>diagnostic_msgs</exec_depend>
   <exec_depend>ifstat</exec_depend>
   <exec_depend>ntpdate</exec_depend>
@@ -29,7 +30,8 @@
 
   <test_depend>ament_lint_auto</test_depend>
   <!-- <test_depend>ament_cmake_copyright</test_depend> -->
-  <test_depend>ament_cmake_flake8</test_depend>
+  <!-- <test_depend>ament_cmake_flake8</test_depend> -->
+  <test_depend>ament_cmake_black</test_depend>
   <test_depend>ament_cmake_mypy</test_depend>
   <test_depend>ament_cmake_lint_cmake</test_depend>
   <test_depend>ament_cmake_pep257</test_depend>
