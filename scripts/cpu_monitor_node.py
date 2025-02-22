@@ -40,20 +40,25 @@ import traceback
 import rclpy
 from ros2_system_monitor import CPUMonitor
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     rclpy.init(args=sys.argv)
 
     hostname = socket.gethostname()
-    hostname = hostname.replace('-', '_')
+    hostname = hostname.replace("-", "_")
 
     import optparse
-    parser = optparse.OptionParser(
-        usage="usage: cpu_monitor.py [--diag-hostname=cX]")
-    parser.add_option("--diag-hostname", dest="diag_hostname",
-                      help="Computer name in diagnostics output (ex: 'c1')",
-                      metavar="DIAG_HOSTNAME",
-                      action="store", default=hostname)
+
+    parser = optparse.OptionParser(usage="usage: cpu_monitor.py [--diag-hostname=cX]")
+    parser.add_option(
+        "--diag-hostname",
+        dest="diag_hostname",
+        help="Computer name in diagnostics output (ex: 'c1')",
+        metavar="DIAG_HOSTNAME",
+        action="store",
+        default=hostname,
+    )
     from rclpy.utilities import remove_ros_args
+
     options, args = parser.parse_args(remove_ros_args(sys.argv)[1:])
 
     try:
@@ -63,6 +68,7 @@ if __name__ == '__main__':
         pass
     except Exception:
         from rclpy.logging import get_logger
+
         get_logger("cpu_monitor_node").error(traceback.format_exc())
 
     cpu_node.cancel_timers()

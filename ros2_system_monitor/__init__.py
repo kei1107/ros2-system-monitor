@@ -39,5 +39,4 @@ from .mem_monitor import MemMonitor
 from .net_monitor import NetMonitor
 from .ntp_monitor import NtpMonitor
 
-__all__ = ['CPUMonitor', 'HDDMonitor',
-           'MemMonitor', 'NetMonitor', 'NtpMonitor']
+__all__ = ["CPUMonitor", "HDDMonitor", "MemMonitor", "NetMonitor", "NtpMonitor"]

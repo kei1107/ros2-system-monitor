@@ -42,8 +42,7 @@ import rclpy
 from diagnostic_msgs.msg import DiagnosticStatus, KeyValue
 from rclpy.node import Node
 from rclpy.time import Time
-from ros2_system_monitor.utilities import (MemDict, StatDict,
-                                           update_status_stale)
+from ros2_system_monitor.utilities import MemDict, StatDict, update_status_stale
 
 
 class MemMonitor(Node):
@@ -51,10 +50,16 @@ class MemMonitor(Node):
         super().__init__("mem_monitor")
         self._mutex = threading.Lock()
 
-        self._mem_level_warn = self.declare_parameter(
-            "mem_level_warn", 0.95).get_parameter_value().double_value
-        self._mem_level_error = self.declare_parameter(
-            "mem_level_error", 0.99).get_parameter_value().double_value
+        self._mem_level_warn = (
+            self.declare_parameter("mem_level_warn", 0.95)
+            .get_parameter_value()
+            .double_value
+        )
+        self._mem_level_error = (
+            self.declare_parameter("mem_level_error", 0.99)
+            .get_parameter_value()
+            .double_value
+        )
 
         # updater
         self.updater = diagnostic_updater.Updater(self)
@@ -63,11 +68,12 @@ class MemMonitor(Node):
         # Memory Stat
         self._usage_stat = DiagnosticStatus()
         self._usage_stat.level = DiagnosticStatus.WARN
-        self._usage_stat.message = 'No Data'
-        self._usage_stat.values = [KeyValue(key='Update Status', value='No Data'),
-                                   KeyValue(key='Time Since Last Update', value='N/A')]
-        self.updater.add(
-            f"Memory Usage ({diag_hostname})", self.update_usage_status)
+        self._usage_stat.message = "No Data"
+        self._usage_stat.values = [
+            KeyValue(key="Update Status", value="No Data"),
+            KeyValue(key="Time Since Last Update", value="N/A"),
+        ]
+        self.updater.add(f"Memory Usage ({diag_hostname})", self.update_usage_status)
 
         self._last_usage_time = Time(seconds=0.0)
 
@@ -86,19 +92,18 @@ class MemMonitor(Node):
         msg = ""
 
         try:
-            p = subprocess.Popen('free -tm',
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE, shell=True)
+            p = subprocess.Popen(
+                "free -tm", stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
+            )
             stdout, _ = p.communicate()
             stdout = stdout.decode()
             retcode = p.returncode
 
             if retcode != 0:
-                values.append(
-                    KeyValue(key="\"free -tm\" Call Error", value=str(retcode)))
+                values.append(KeyValue(key='"free -tm" Call Error', value=str(retcode)))
                 return DiagnosticStatus.ERROR, values
 
-            rows = stdout.split('\n')
+            rows = stdout.split("\n")
             data = rows[1].split()
             total_mem_physical = data[1]
             used_mem_physical = data[2]
@@ -113,35 +118,37 @@ class MemMonitor(Node):
             free_mem = data[3]
 
             level = DiagnosticStatus.OK
-            mem_usage = float(used_mem_physical)/float(total_mem_physical)
-            if (mem_usage < self._mem_level_warn):
+            mem_usage = float(used_mem_physical) / float(total_mem_physical)
+            if mem_usage < self._mem_level_warn:
                 level = DiagnosticStatus.OK
-            elif (mem_usage < self._mem_level_error):
+            elif mem_usage < self._mem_level_error:
                 level = DiagnosticStatus.WARN
             else:
                 level = DiagnosticStatus.ERROR
 
-            values.append(KeyValue(key='Memory Status', value=MemDict[level]))
-            values.append(KeyValue(key='Total Memory (Physical)',
-                          value=total_mem_physical+"M"))
-            values.append(KeyValue(key='Used Memory (Physical)',
-                          value=used_mem_physical+"M"))
-            values.append(KeyValue(key='Free Memory (Physical)',
-                          value=free_mem_physical+"M"))
-            values.append(KeyValue(key='Total Memory (Swap)',
-                          value=total_mem_swap+"M"))
-            values.append(KeyValue(key='Used Memory (Swap)',
-                          value=used_mem_swap+"M"))
-            values.append(KeyValue(key='Free Memory (Swap)',
-                          value=free_mem_swap+"M"))
-            values.append(KeyValue(key='Total Memory', value=total_mem+"M"))
-            values.append(KeyValue(key='Used Memory', value=used_mem+"M"))
-            values.append(KeyValue(key='Free Memory', value=free_mem+"M"))
+            values.append(KeyValue(key="Memory Status", value=MemDict[level]))
+            values.append(
+                KeyValue(key="Total Memory (Physical)", value=total_mem_physical + "M")
+            )
+            values.append(
+                KeyValue(key="Used Memory (Physical)", value=used_mem_physical + "M")
+            )
+            values.append(
+                KeyValue(key="Free Memory (Physical)", value=free_mem_physical + "M")
+            )
+            values.append(
+                KeyValue(key="Total Memory (Swap)", value=total_mem_swap + "M")
+            )
+            values.append(KeyValue(key="Used Memory (Swap)", value=used_mem_swap + "M"))
+            values.append(KeyValue(key="Free Memory (Swap)", value=free_mem_swap + "M"))
+            values.append(KeyValue(key="Total Memory", value=total_mem + "M"))
+            values.append(KeyValue(key="Used Memory", value=used_mem + "M"))
+            values.append(KeyValue(key="Free Memory", value=free_mem + "M"))
 
             msg = MemDict[level]
         except Exception as e:
             self.get_logger().error(traceback.format_exc())
-            msg = 'Memory Usage Check Error'
+            msg = "Memory Usage Check Error"
             values.append(KeyValue(key=msg, value=str(e)))
             level = DiagnosticStatus.ERROR
 
@@ -154,8 +161,10 @@ class MemMonitor(Node):
             return
 
         diag_level = DiagnosticStatus.OK
-        diag_vals = [KeyValue(key='Update Status', value='OK'),
-                     KeyValue(key='Time Since Last Update', value=str(Time(seconds=0.0)))]
+        diag_vals = [
+            KeyValue(key="Update Status", value="OK"),
+            KeyValue(key="Time Since Last Update", value=str(Time(seconds=0.0))),
+        ]
         diag_msgs: list[str] = []
 
         # Check memory
@@ -166,7 +175,7 @@ class MemMonitor(Node):
         diag_level = max(diag_level, mem_level)
 
         if diag_msgs and diag_level != DiagnosticStatus.OK:
-            usage_msg = ', '.join(set(diag_msgs))
+            usage_msg = ", ".join(set(diag_msgs))
         else:
             usage_msg = StatDict[diag_level]
 
@@ -184,9 +193,11 @@ class MemMonitor(Node):
 
     def update_usage_status(self, stat: diagnostic_updater.DiagnosticStatusWrapper):
         with self._mutex:
-            update_status_stale(stat=self._usage_stat,
-                                clock=self.get_clock(),
-                                last_update_time=self._last_usage_time)
+            update_status_stale(
+                stat=self._usage_stat,
+                clock=self.get_clock(),
+                last_update_time=self._last_usage_time,
+            )
             stat.summary(self._usage_stat.level, self._usage_stat.message)
             value: KeyValue
             for value in self._usage_stat.values:

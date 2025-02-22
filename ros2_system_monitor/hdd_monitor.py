@@ -44,8 +44,12 @@ import rclpy
 from diagnostic_msgs.msg import DiagnosticStatus, KeyValue
 from rclpy.node import Node
 from rclpy.time import Time
-from ros2_system_monitor.utilities import (StatDict, TempDict, UsageDict,
-                                           update_status_stale)
+from ros2_system_monitor.utilities import (
+    StatDict,
+    TempDict,
+    UsageDict,
+    update_status_stale,
+)
 
 
 class HDDMonitor(Node):
@@ -53,18 +57,34 @@ class HDDMonitor(Node):
         super().__init__("hdd_monitor")
         self._mutex = threading.Lock()
 
-        self._no_temp = self.declare_parameter(
-            "no_hw_temp", False).get_parameter_value().bool_value
-        self._no_temp_warn = self.declare_parameter(
-            "no_hw_temp_warn", False).get_parameter_value().bool_value
-        self._hdd_level_warn = self.declare_parameter(
-            "hdd_level_warn", 0.95).get_parameter_value().double_value
-        self._hdd_level_error = self.declare_parameter(
-            "hdd_level_error", 0.99).get_parameter_value().double_value
-        self._hdd_temp_warn = self.declare_parameter(
-            "hdd_temp_warn", 55.0).get_parameter_value().double_value
-        self._hdd_temp_error = self.declare_parameter(
-            "hdd_temp_error", 70.0).get_parameter_value().double_value
+        self._no_temp = (
+            self.declare_parameter("no_hw_temp", False).get_parameter_value().bool_value
+        )
+        self._no_temp_warn = (
+            self.declare_parameter("no_hw_temp_warn", False)
+            .get_parameter_value()
+            .bool_value
+        )
+        self._hdd_level_warn = (
+            self.declare_parameter("hdd_level_warn", 0.95)
+            .get_parameter_value()
+            .double_value
+        )
+        self._hdd_level_error = (
+            self.declare_parameter("hdd_level_error", 0.99)
+            .get_parameter_value()
+            .double_value
+        )
+        self._hdd_temp_warn = (
+            self.declare_parameter("hdd_temp_warn", 55.0)
+            .get_parameter_value()
+            .double_value
+        )
+        self._hdd_temp_error = (
+            self.declare_parameter("hdd_temp_error", 70.0)
+            .get_parameter_value()
+            .double_value
+        )
 
         # updater
         self.updater = diagnostic_updater.Updater(self)
@@ -75,19 +95,23 @@ class HDDMonitor(Node):
             self._temp_stat = DiagnosticStatus()
             self._temp_stat.level = DiagnosticStatus.WARN
             self._temp_stat.message = "No Data"
-            self._temp_stat.values = [KeyValue(key="Update Status", value="No Data"),
-                                      KeyValue(key="Time Since Last Update", value="N/A")]
+            self._temp_stat.values = [
+                KeyValue(key="Update Status", value="No Data"),
+                KeyValue(key="Time Since Last Update", value="N/A"),
+            ]
             self.updater.add(
-                f"HW Temperature ({diag_hostname})", self.update_temp_status)
+                f"HW Temperature ({diag_hostname})", self.update_temp_status
+            )
 
         # Usage Stat
         self._usage_stat = DiagnosticStatus()
         self._usage_stat.level = DiagnosticStatus.WARN
         self._usage_stat.name = "HDD Usage (%s)" % diag_hostname
-        self._usage_stat.values = [KeyValue(key="Update Status", value="No Data"),
-                                   KeyValue(key="Time Since Last Update", value="N/A")]
-        self.updater.add(
-            f"HDD Usage ({diag_hostname})", self.update_usage_status)
+        self._usage_stat.values = [
+            KeyValue(key="Update Status", value="No Data"),
+            KeyValue(key="Time Since Last Update", value="N/A"),
+        ]
+        self.updater.add(f"HDD Usage ({diag_hostname})", self.update_usage_status)
 
         self._last_temp_time = Time(seconds=0.0)
         self._last_usage_time = Time(seconds=0.0)
@@ -131,29 +155,33 @@ class HDDMonitor(Node):
                 self.cancel_timers()
             return
 
-        diag_strs = [KeyValue(key="Update Status", value="OK"),
-                     KeyValue(key="Time Since Last Update", value=str(Time(seconds=0.0)))]
+        diag_strs = [
+            KeyValue(key="Update Status", value="OK"),
+            KeyValue(key="Time Since Last Update", value=str(Time(seconds=0.0))),
+        ]
         diag_msgs: list[str] = []
         diag_level = DiagnosticStatus.OK
 
         sensors_ok = True
 
         try:
-            p = subprocess.Popen('sensors -j',
-                                 stdout=subprocess.PIPE,
-                                 stderr=subprocess.PIPE, shell=True)
+            p = subprocess.Popen(
+                "sensors -j", stdout=subprocess.PIPE, stderr=subprocess.PIPE, shell=True
+            )
             stdout, _ = p.communicate()
             stdout = stdout.decode()
             retcode = p.returncode
             if retcode != 0:
                 if not self._has_warned_sensors:
                     self.get_logger().error(
-                        f"'sensors' failed to run for hdd_monitor. Return code {retcode}.")
+                        f"'sensors' failed to run for hdd_monitor. Return code {retcode}."
+                    )
                     self._has_warned_sensors = True
 
                 diag_level = DiagnosticStatus.ERROR
                 diag_strs.append(
-                    KeyValue(key='\"sensors -j\" Call Error', value=str(retcode)))
+                    KeyValue(key='"sensors -j" Call Error', value=str(retcode))
+                )
                 diag_msgs.append("Unable to Check HW Temp")
                 sensors_ok = False
             else:
@@ -172,9 +200,14 @@ class HDDMonitor(Node):
 
                     diag_level = max(diag_level, temp_level)
                     diag_strs.append(
-                        KeyValue(key=f"{hw_path} Temperature Status", value=TempDict[temp_level]))
+                        KeyValue(
+                            key=f"{hw_path} Temperature Status",
+                            value=TempDict[temp_level],
+                        )
+                    )
                     diag_strs.append(
-                        KeyValue(key=f"{hw_path} Temperature", value=str(temp)+"DegC"))
+                        KeyValue(key=f"{hw_path} Temperature", value=str(temp) + "DegC")
+                    )
 
         except Exception as e:
             self.get_logger().error(traceback.print_exc())
@@ -184,7 +217,7 @@ class HDDMonitor(Node):
 
         diag_log = set(diag_msgs)
         if len(diag_log) > 0:
-            message = ', '.join(diag_log)
+            message = ", ".join(diag_log)
         else:
             message = TempDict[diag_level]
 
@@ -208,21 +241,23 @@ class HDDMonitor(Node):
                 self.cancel_timers()
             return
 
-        diag_vals = [KeyValue(key="Update Status", value="OK"),
-                     KeyValue(key="Time Since Last Update", value=str(Time(seconds=0.0)))]
+        diag_vals = [
+            KeyValue(key="Update Status", value="OK"),
+            KeyValue(key="Time Since Last Update", value=str(Time(seconds=0.0))),
+        ]
         diag_level = DiagnosticStatus.OK
         diag_message = "OK"
 
         try:
-            p = subprocess.Popen(["df", "-Pht", "ext4"],
-                                 stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+            p = subprocess.Popen(
+                ["df", "-Pht", "ext4"], stdout=subprocess.PIPE, stderr=subprocess.PIPE
+            )
             stdout, _ = p.communicate()
             stdout = stdout.decode()
             retcode = p.returncode
 
-            if (retcode == 0 or retcode == 1):
-                diag_vals.append(
-                    KeyValue(key="Disk Space Reading", value="OK"))
+            if retcode == 0 or retcode == 1:
+                diag_vals.append(KeyValue(key="Disk Space Reading", value="OK"))
                 rows = stdout.split("\n")
                 del rows[0]
                 row_count = 0
@@ -240,42 +275,41 @@ class HDDMonitor(Node):
                     size = row.split()[1]
                     mount_pt = row.split()[-1]
 
-                    hdd_usage = float(g_use.replace("%", ""))*1e-2
-                    if (hdd_usage < self._hdd_level_warn):
+                    hdd_usage = float(g_use.replace("%", "")) * 1e-2
+                    if hdd_usage < self._hdd_level_warn:
                         level = DiagnosticStatus.OK
-                    elif (hdd_usage < self._hdd_level_error):
+                    elif hdd_usage < self._hdd_level_error:
                         level = DiagnosticStatus.WARN
                     else:
                         level = DiagnosticStatus.ERROR
 
+                    diag_vals.append(KeyValue(key=f"Disk {row_count} Name", value=name))
+                    diag_vals.append(KeyValue(key=f"Disk {row_count} Size", value=size))
                     diag_vals.append(
-                        KeyValue(key=f"Disk {row_count} Name", value=name))
+                        KeyValue(key=f"Disk {row_count} Available", value=g_available)
+                    )
+                    diag_vals.append(KeyValue(key=f"Disk {row_count} Use", value=g_use))
                     diag_vals.append(
-                        KeyValue(key=f"Disk {row_count} Size", value=size))
+                        KeyValue(key=f"Disk {row_count} Status", value=StatDict[level])
+                    )
                     diag_vals.append(
-                        KeyValue(key=f"Disk {row_count} Available", value=g_available))
-                    diag_vals.append(
-                        KeyValue(key=f"Disk {row_count} Use", value=g_use))
-                    diag_vals.append(
-                        KeyValue(key=f"Disk {row_count} Status", value=StatDict[level]))
-                    diag_vals.append(
-                        KeyValue(key=f"Disk {row_count} Mount Point", value=mount_pt))
+                        KeyValue(key=f"Disk {row_count} Mount Point", value=mount_pt)
+                    )
 
                     diag_level = max(diag_level, level)
                     diag_message = UsageDict[diag_level]
 
             else:
-                diag_vals.append(
-                    KeyValue(key="Disk Space Reading", value="Failed"))
+                diag_vals.append(KeyValue(key="Disk Space Reading", value="Failed"))
                 diag_level = DiagnosticStatus.ERROR
                 diag_message = StatDict[diag_level]
 
         except Exception:
             self.get_logger().error(traceback.print_exc())
+            diag_vals.append(KeyValue(key="Disk Space Reading", value="Exception"))
             diag_vals.append(
-                KeyValue(key="Disk Space Reading", value="Exception"))
-            diag_vals.append(KeyValue(key="Disk Space Ex",
-                             value=traceback.format_exc()))
+                KeyValue(key="Disk Space Ex", value=traceback.format_exc())
+            )
 
             diag_level = DiagnosticStatus.ERROR
             diag_message = StatDict[diag_level]
@@ -294,9 +328,11 @@ class HDDMonitor(Node):
 
     def update_temp_status(self, stat: diagnostic_updater.DiagnosticStatusWrapper):
         with self._mutex:
-            update_status_stale(stat=self._temp_stat,
-                                clock=self.get_clock(),
-                                last_update_time=self._last_temp_time)
+            update_status_stale(
+                stat=self._temp_stat,
+                clock=self.get_clock(),
+                last_update_time=self._last_temp_time,
+            )
             stat.summary(self._temp_stat.level, self._temp_stat.message)
             value: KeyValue
             for value in self._temp_stat.values:
@@ -305,9 +341,11 @@ class HDDMonitor(Node):
 
     def update_usage_status(self, stat: diagnostic_updater.DiagnosticStatusWrapper):
         with self._mutex:
-            update_status_stale(stat=self._usage_stat,
-                                clock=self.get_clock(),
-                                last_update_time=self._last_usage_time)
+            update_status_stale(
+                stat=self._usage_stat,
+                clock=self.get_clock(),
+                last_update_time=self._last_usage_time,
+            )
             stat.summary(self._usage_stat.level, self._usage_stat.message)
             value: KeyValue
             for value in self._usage_stat.values:
