@@ -32,5 +32,5 @@ rosdep install -i --from-paths ros2-system-monitor
 **build**
 
 ```shell
-colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Releae
+colcon build --symlink-install --cmake-args -DCMAKE_BUILD_TYPE=Release
 ```
